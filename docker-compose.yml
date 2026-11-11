@@ -1,0 +1,10 @@
+# `docker compose up --build` runs the app at http://localhost:3000 with settings from .env
+# (copy .env.example to .env and add GOOGLE_GENERATIVE_AI_API_KEY).
+services:
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "127.0.0.1:3000:3000"
