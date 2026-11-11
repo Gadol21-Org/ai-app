@@ -9,6 +9,7 @@ multi-model flows come later.
 
 ```
 cp .env.example .env     # add GOOGLE_GENERATIVE_AI_API_KEY
+docker compose up -d mysql   # MySQL 8 on localhost:3306, matches MYSQL_URL in .env.example
 npm install
 npm run dev              # http://localhost:3000
 ```
@@ -31,9 +32,24 @@ one line to the `providers` map; the chat route and UI don't change.
 | `components/assistant-ui`, `components/ui` | Components installed with the shadcn CLI (`npx shadcn add @assistant-ui/...`). |
 | `app/manifest.ts`, `public/sw.js` | PWA manifest and service worker. |
 | `lib/models.ts` | The swappable model/provider layer. |
+| `lib/chat-storage.ts`, `app/api/threads` | Thread list and message history, client adapter and API. |
+| `app/settings/page.tsx`, `lib/usage.ts` | Spend page and its queries. |
 
-Chat threads are kept in the browser's memory for now (they vanish on reload); persistence is a
-follow-up.
+## Storage
+
+Conversations, messages and spend live in MySQL (`MYSQL_URL`), so history survives reloads and is
+shared across devices. The schema is in [`lib/db/schema.ts`](lib/db/schema.ts) (Drizzle ORM). After
+changing it, run `npm run db:generate` and commit the new file in `drizzle/`; migrations are applied
+when the server starts.
+
+Deleting a conversation removes its messages but keeps its name and spend records.
+
+## Spend
+
+Every model call is recorded with its token counts and a cost computed from the price table in
+[`lib/pricing.ts`](lib/pricing.ts) at the time of the call. **Settings** (sidebar) shows the last
+30 days, all time, and a per-conversation breakdown. The numbers are estimates from list prices;
+when a model or price changes, update `lib/pricing.ts` (a model without an entry is recorded at $0).
 
 ## Deployment
 

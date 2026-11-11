@@ -78,9 +78,11 @@ jobs:
           AI_APP_ENV: ${{ secrets.AI_APP_ENV }}
         run: |
           if [ -z "$AI_APP_ENV" ]; then echo "::error::the AI_APP_ENV secret is not set"; exit 1; fi
-          if ! printf '%s\n' "$AI_APP_ENV" | grep -q "^GOOGLE_GENERATIVE_AI_API_KEY=."; then
-            echo "::error::AI_APP_ENV has no GOOGLE_GENERATIVE_AI_API_KEY= line"; exit 1
-          fi
+          for name in GOOGLE_GENERATIVE_AI_API_KEY MYSQL_URL; do
+            if ! printf '%s\n' "$AI_APP_ENV" | grep -q "^$name=."; then
+              echo "::error::AI_APP_ENV has no $name= line"; exit 1
+            fi
+          done
           # The file goes over ssh's stdin, never onto a command line. It is
           # replaced in one step and readable by this user only.
           printf '%s\n' "$AI_APP_ENV" \
