@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs on the VM: replaces the running Family AI container with the given image.
-#   ai-app  published on 127.0.0.1:8084 of the VM only
+#   ai-app  published on 127.0.0.1:8085 of the VM only
 # The cloudflared service on the VM forwards a public hostname to that port.
 # Usage: deploy.sh <image>
 set -euo pipefail
@@ -9,7 +9,7 @@ image="$1"
 dir="$HOME/ai-app"
 env_file="$dir/.env"
 name=ai-app
-host_port=8084
+host_port=8085
 
 if [ ! -f "$env_file" ]; then
   echo "$env_file is missing; the workflow writes it from the AI_APP_ENV secret" >&2

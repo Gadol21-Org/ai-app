@@ -2,7 +2,7 @@
 
 Every push to `main` runs [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml): it builds the
 [`Dockerfile`](../Dockerfile), pushes `ghcr.io/gadol21-org/ai-app` tagged with the commit, then SSHes to the VM and
-runs [`deploy.sh`](deploy.sh), which replaces the `ai-app` container (published on `127.0.0.1:8084` of the VM
+runs [`deploy.sh`](deploy.sh), which replaces the `ai-app` container (published on `127.0.0.1:8085` of the VM
 only; it fails the run with logs if the container doesn't stay up). Pull requests only build. The deploy step is
 skipped until the `ORACLE_HOST` variable is set. Run it by hand from **Actions > Deploy > Run workflow**.
 
@@ -14,11 +14,11 @@ This is the same VM, deploy key and `cloudflared` tunnel as budget-tracking, so 
 |---|---|
 | 8082 | `budget-tracking` |
 | 8083 | `budget-staging` |
-| 8084 | `ai-app` (`host_port` in `deploy.sh`) |
+| 8085 | `ai-app` (`host_port` in `deploy.sh`) |
 
 ## One-time setup
 
-1. **Tunnel hostname.** In the Cloudflare tunnel add a public hostname (e.g. `ai.example.com`) to `http://localhost:8084`.
+1. **Tunnel hostname.** In the Cloudflare tunnel add a public hostname (e.g. `ai.example.com`) to `http://localhost:8085`.
 2. **Protect it.** Cloudflare Zero Trust > Access > add a self-hosted application for that hostname, allowing only
    your family's emails. The app has no login of its own and spends your Gemini quota.
 3. **GitHub settings** (Settings > Secrets and variables > Actions), same names as budget-tracking:
