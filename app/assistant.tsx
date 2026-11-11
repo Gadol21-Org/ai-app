@@ -1,18 +1,28 @@
 "use client";
 
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import {
+  AssistantRuntimeProvider,
+  useRemoteThreadListRuntime,
+} from "@assistant-ui/react";
 import { AssistantChatTransport, useChatRuntime } from "@assistant-ui/ai-sdk";
 import { Thread } from "@/components/assistant-ui/elements/thread.aui";
 import { ThreadListSidebar } from "@/components/assistant-ui/elements/threadlist-sidebar.aui";
+import { threadListAdapter } from "@/lib/chat-storage";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-export const Assistant = () => {
-  const runtime = useChatRuntime({
+const useThreadRuntime = () =>
+  useChatRuntime({
     transport: new AssistantChatTransport({ api: "/api/chat" }),
+  });
+
+export const Assistant = () => {
+  const runtime = useRemoteThreadListRuntime({
+    runtimeHook: useThreadRuntime,
+    adapter: threadListAdapter,
   });
 
   return (

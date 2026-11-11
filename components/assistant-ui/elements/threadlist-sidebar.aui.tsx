@@ -1,5 +1,6 @@
 import type * as React from "react";
-import { MessagesSquare } from "lucide-react";
+import { MessagesSquare, Settings } from "lucide-react";
+import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Sidebar,
@@ -48,6 +49,14 @@ export function ThreadListSidebar({
       </SidebarContent>
       {props.collapsible !== "none" && <SidebarRail />}
       <SidebarFooter className="aui-sidebar-footer border-t">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<Link href="/settings" />}>
+              <Settings />
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <ThemeToggle />
       </SidebarFooter>
     </Sidebar>

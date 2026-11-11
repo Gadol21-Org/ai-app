@@ -14,7 +14,12 @@ const providers: Record<string, (modelId: string) => LanguageModel> = {
 
 export const DEFAULT_CHAT_MODEL = "google:gemini-3.8-flash";
 
-export function getChatModel(spec = process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL) {
+/** The configured `provider:model` id; also the key used for pricing and spend records. */
+export function getChatModelId() {
+  return process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL;
+}
+
+export function getChatModel(spec = getChatModelId()) {
   const [provider, ...rest] = spec.split(":");
   const create = providers[provider];
   if (!create || rest.length === 0) {
