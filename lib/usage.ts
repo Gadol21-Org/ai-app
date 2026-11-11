@@ -9,7 +9,7 @@ const { usageEvents, threads } = schema;
 /** Record one model call. Never throws: losing a usage row must not break a chat. */
 export async function recordUsage(opts: {
   threadId: string | null;
-  kind: "chat" | "title";
+  kind: "chat" | "title" | "schedule";
   modelId: string;
   usage: LanguageModelUsage;
 }) {

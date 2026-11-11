@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CalendarClock, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +67,20 @@ export default async function SettingsPage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <Link
+          href="/settings/schedules"
+          className="hover:bg-muted/50 flex items-center gap-3 rounded-lg border p-4 transition-colors"
+        >
+          <CalendarClock className="text-muted-foreground size-5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">Scheduled prompts</div>
+            <div className="text-muted-foreground text-sm">
+              Prompts the assistant runs on its own, once or on a repeat.
+            </div>
+          </div>
+          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+        </Link>
+
         <section className="flex flex-col gap-3">
           <div>
             <h2 className="text-lg font-semibold">Spend</h2>
