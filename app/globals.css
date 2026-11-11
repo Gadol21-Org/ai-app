@@ -161,8 +161,29 @@
     color-scheme: dark;
   }
 
+  /* App-like feel: no pinch/double-tap zoom (iOS ignores the viewport meta in
+     the browser, so touch-action does it), no rubber-band or pull-to-refresh,
+     no text inflation on rotate, no grey tap flash. */
+  html {
+    touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-optical-sizing: auto;
+    overscroll-behavior: none;
+  }
+
+  /* iOS zooms the page when a focused field's text is under 16px. */
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
   }
 }
