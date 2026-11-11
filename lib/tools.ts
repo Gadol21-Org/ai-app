@@ -1,7 +1,7 @@
 import "server-only";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
-import { createSchedule } from "@/lib/schedules/store";
+import { createSchedule, deleteSchedule, getSchedule, listSchedules } from "@/lib/schedules/store";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
 /**
@@ -73,8 +73,46 @@ const addSchedule = tool({
   },
 });
 
+const listSchedulesTool = tool({
+  description:
+    "List the user's saved scheduled prompts: id, title, prompt, when it runs, whether it is enabled, and its next and last run. " +
+    "Use it to answer questions about existing schedules, and to find the id before deleting one.",
+  inputSchema: z.object({}),
+  execute: async () =>
+    (await listSchedules()).map((s) => ({
+      id: s.id,
+      title: s.title,
+      prompt: s.prompt,
+      runs: describeTiming(
+        s.kind === "cron"
+          ? { kind: "cron", cron: s.cron, timezone: s.timezone }
+          : { kind: "once", runAt: s.runAt },
+        s.timezone,
+      ),
+      enabled: s.enabled,
+      nextRunAt: s.nextRunAt?.toISOString() ?? null,
+      lastRunAt: s.lastRunAt?.toISOString() ?? null,
+      lastStatus: s.lastStatus,
+    })),
+});
+
+const deleteScheduleTool = tool({
+  description:
+    "Permanently delete a scheduled prompt by id (get the id from list_schedules). " +
+    "The user sees the schedule and must approve before it is deleted.",
+  inputSchema: z.object({ id: z.string().min(1).describe("The schedule's id from list_schedules.") }),
+  execute: async ({ id }) => {
+    const schedule = await getSchedule(id);
+    if (!schedule) throw new Error("No schedule with that id.");
+    await deleteSchedule(id);
+    return { deleted: true, title: schedule.title };
+  },
+});
+
 const registry: Record<string, AgentTool> = {
   add_schedule: { tool: addSchedule, requiresApproval: true, availableInScheduledRuns: false },
+  list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
+  delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
 };
 
 function pick(filter: (t: AgentTool) => boolean): ToolSet {
