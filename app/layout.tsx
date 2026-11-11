@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   title: "Family AI",
   description: "Our family's AI assistant",
   appleWebApp: { capable: true, title: "Family AI", statusBarStyle: "default" },
-  icons: { icon: "/icon.svg", apple: "/icons/apple-touch-icon.png" },
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
