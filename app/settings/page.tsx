@@ -18,8 +18,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCount, formatDay, formatUsd } from "@/lib/format";
+import { formatBytes, formatCount, formatDay, formatUsd } from "@/lib/format";
 import { getChatModelId } from "@/lib/models";
+import { retentionDays } from "@/lib/retention";
+import { getConversationSizes, getDatabaseSize } from "@/lib/storage";
 import { getSpendSummary, type SpendTotals } from "@/lib/usage";
 
 export const metadata: Metadata = { title: "Settings · Family AI" };
@@ -43,7 +45,11 @@ function SpendCard({ label, hint, totals }: { label: string; hint: string; total
 }
 
 export default async function SettingsPage() {
-  const { allTime, last30Days, byConversation, byModel } = await getSpendSummary();
+  const [{ allTime, last30Days, byConversation, byModel }, db, sizes] = await Promise.all([
+    getSpendSummary(),
+    getDatabaseSize(),
+    getConversationSizes(),
+  ]);
 
   return (
     <div className="h-dvh overflow-y-auto">
@@ -89,6 +95,7 @@ export default async function SettingsPage() {
                     <TableHead>Conversation</TableHead>
                     <TableHead className="hidden sm:table-cell">Last used</TableHead>
                     <TableHead className="hidden text-right sm:table-cell">Tokens</TableHead>
+                    <TableHead className="hidden text-right sm:table-cell">Stored</TableHead>
                     <TableHead className="text-right">Cost</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -102,7 +109,10 @@ export default async function SettingsPage() {
                           {c.status === "archived" && <Badge variant="outline">Archived</Badge>}
                         </div>
                         <div className="text-muted-foreground text-xs sm:hidden">
-                          {formatDay(c.lastUsedAt)} · {formatCount(c.inputTokens + c.outputTokens)} tokens
+                          {formatDay(c.lastUsedAt)} · {formatCount(c.inputTokens + c.outputTokens)} tokens ·{" "}
+                          {c.threadId && sizes.has(c.threadId)
+                            ? formatBytes(sizes.get(c.threadId)!.bytes)
+                            : "no stored messages"}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground hidden whitespace-nowrap sm:table-cell">
@@ -110,6 +120,11 @@ export default async function SettingsPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
                         {formatCount(c.inputTokens + c.outputTokens)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
+                        {c.threadId && sizes.has(c.threadId)
+                          ? formatBytes(sizes.get(c.threadId)!.bytes)
+                          : "–"}
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">
                         {formatUsd(c.costUsd)}
@@ -123,13 +138,77 @@ export default async function SettingsPage() {
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Model</h2>
+          <div>
+            <h2 className="text-lg font-semibold">Database size</h2>
+            <p className="text-muted-foreground text-sm">
+              Read live from MySQL: data plus indexes of this app&apos;s tables. The free instance&apos;s
+              50 GiB is shared with other apps, and backups are not counted here.
+            </p>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardDescription>This app&apos;s database</CardDescription>
+              <CardTitle className="text-3xl tabular-nums">{formatBytes(db.totalBytes)}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-muted-foreground text-sm tabular-nums">
+              {db.totalBytes.toLocaleString("en-US")} bytes
+            </CardContent>
+          </Card>
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Table</TableHead>
+                  <TableHead className="hidden text-right sm:table-cell">Rows</TableHead>
+                  <TableHead className="hidden text-right sm:table-cell">Data</TableHead>
+                  <TableHead className="hidden text-right sm:table-cell">Indexes</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {db.tables.map((t) => (
+                  <TableRow key={t.table}>
+                    <TableCell className="font-mono text-xs">{t.table}</TableCell>
+                    <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
+                      {t.rows.toLocaleString("en-US")}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
+                      {formatBytes(t.dataBytes)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
+                      {formatBytes(t.indexBytes)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      {formatBytes(t.dataBytes + t.indexBytes)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            The &quot;Stored&quot; column above is the size of each conversation&apos;s message content.
+            MySQL allocates space in 16 KB pages, so each table takes at least 16 KB and small
+            changes show up in steps. Row counts are MySQL&apos;s own approximation; the sizes are exact.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Model and storage</h2>
           <div className="rounded-lg border">
             <Table>
               <TableBody>
                 <TableRow>
                   <TableCell className="text-muted-foreground">In use now</TableCell>
                   <TableCell className="text-right font-mono text-xs">{getChatModelId()}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-muted-foreground">Conversations kept for</TableCell>
+                  <TableCell className="text-right">
+                    {retentionDays() === 0
+                      ? "Forever"
+                      : `${retentionDays()} days after the last message`}
+                  </TableCell>
                 </TableRow>
                 {byModel.map((m) => (
                   <TableRow key={m.model}>

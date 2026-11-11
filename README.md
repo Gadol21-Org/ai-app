@@ -42,7 +42,9 @@ shared across devices. The schema is in [`lib/db/schema.ts`](lib/db/schema.ts) (
 changing it, run `npm run db:generate` and commit the new file in `drizzle/`; migrations are applied
 when the server starts.
 
-Deleting a conversation removes its messages but keeps its name and spend records.
+Conversations are kept for 30 days after their last message (`RETENTION_DAYS`, 0 = forever), then
+their messages are deleted, hourly and at startup. Deleting one by hand does the same immediately.
+Either way its name and spend records stay.
 
 ## Spend
 
