@@ -1,4 +1,11 @@
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  isStepCount,
+  pruneMessages,
+  streamText,
+  type UIMessage,
+} from "ai";
+import { getMcpTools } from "@/lib/mcp";
 import { getChatModel } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 
@@ -11,7 +18,13 @@ export async function POST(req: Request) {
     abortSignal: req.signal,
     model: getChatModel(),
     system: SYSTEM_PROMPT,
-    messages: await convertToModelMessages(messages),
+    // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
+    messages: pruneMessages({
+      messages: await convertToModelMessages(messages),
+      toolCalls: "before-last-4-messages",
+    }),
+    tools: await getMcpTools(),
+    stopWhen: isStepCount(10),
   });
 
   return result.toUIMessageStreamResponse({

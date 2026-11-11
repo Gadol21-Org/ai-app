@@ -6,6 +6,9 @@ updates:
     open-pull-requests-limit: 5
     groups:
       npm-minor-patch: { update-types: [minor, patch] }
+  - package-ecosystem: npm
+    directory: /mcp-servers
+    schedule: { interval: weekly, day: monday }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }

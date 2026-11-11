@@ -37,6 +37,35 @@ This is the same VM, deploy key and `cloudflared` tunnel as budget-tracking, so 
 ```
 GOOGLE_GENERATIVE_AI_API_KEY=...
 # CHAT_MODEL=google:gemini-3.8-flash
+WANDERLOG_COOKIE=s%3A...
 ```
 
 To change a setting, update the secret and re-run the workflow (the file is written on each deploy).
+
+## Agent tools (MCP)
+
+The chat agent can call [MCP](https://modelcontextprotocol.io) servers as tools. All of this is optional: with none of
+the variables below set the app starts normally and just has no extra tools. A server that fails to start is logged
+(`[mcp] <name> unavailable`) and skipped. Add or change these lines in `AI_APP_ENV` and re-run the workflow.
+
+| Variable | Meaning |
+|---|---|
+| `WANDERLOG_COOKIE` | Enables the Wanderlog tools (trips, places, notes, hotels, checklists, expenses). The value of the `connect.sid` cookie of a logged-in session on wanderlog.com. |
+| `MCP_SERVERS` | Optional JSON for more servers, one line: `{"name":{"url":"https://host/mcp","headers":{"Authorization":"Bearer ..."}}}` for a remote server, or `{"name":{"command":"node","args":["server.js"],"env":{"KEY":"value"}}}` for a local process. |
+| `MCP_MAX_RESULT_CHARS` | Tool results longer than this (default `8000`) are truncated before they reach the chat, the database and the model. |
+
+### Wanderlog
+
+Wanderlog has no public API. The app uses the community [`wanderlog-mcp`](https://github.com/shaikhspeare/wanderlog-mcp)
+server (MIT, the most used and maintained of the ones on GitHub; **unofficial**, not made by Wanderlog). It is pinned
+in `mcp-servers/package-lock.json`, installed in the Docker image without install scripts, and only talks to
+`wanderlog.com`. Things to know:
+
+- It signs in with your **session cookie**, which gives the same access as your login (including editing and deleting
+  trips). Keep it only in the `AI_APP_ENV` secret. Only that one variable is passed to the server process.
+- To get it: log in at wanderlog.com, open DevTools > Application > Cookies > `https://wanderlog.com`, copy the
+  `connect.sid` value (starts with `s%3A`).
+- It lasts about a year, and stops working if you log out of Wanderlog, change the password or Wanderlog revokes it.
+  Then replace the value in `AI_APP_ENV` and re-run the workflow.
+- Wanderlog can change its private API at any time and break the tools until the package is updated (Dependabot
+  watches it).
