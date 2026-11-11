@@ -30,6 +30,11 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: dark)", color: "#18181b" },
   ],
   viewportFit: "cover",
+  // Feel like an installed app: no pinch or double-tap zoom.
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
