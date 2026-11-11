@@ -58,7 +58,9 @@ when a model or price changes, update `lib/pricing.ts` (a model without an entry
 The agent can run a saved prompt later, once or on a repeat (`lib/schedules/`). Ask it in a chat
 ("every weekday at 8, summarize..."); the `add_schedule` tool shows you the title, time and full
 prompt and only saves after you tap Allow. Manage them at Settings → Scheduled prompts (disable,
-delete, run now, last result).
+delete, run now, last result). Every run is also saved as a conversation, listed under the
+sidebar's **Scheduled** tab, where you can open it and reply. If you type a message instead of
+tapping Allow/Deny on an approval card, that counts as Deny.
 
 - Stored in MySQL (`schedules`, `schedule_runs`); a poller checks every 30 s, so schedules survive
   restarts and a firing missed during downtime runs once on startup. Repeats use cron expressions

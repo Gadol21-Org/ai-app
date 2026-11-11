@@ -16,6 +16,7 @@ CREATE TABLE `schedule_runs` (
 	`id` bigint unsigned AUTO_INCREMENT NOT NULL,
 	`schedule_id` varchar(36) NOT NULL,
 	`status` enum('running','success','error','awaiting_approval') NOT NULL,
+	`thread_id` varchar(64),
 	`output` text,
 	`error` text,
 	`started_at` timestamp(3) NOT NULL DEFAULT (now()),
@@ -40,6 +41,7 @@ CREATE TABLE `schedules` (
 );
 --> statement-breakpoint
 ALTER TABLE `usage_events` MODIFY COLUMN `kind` enum('chat','title','schedule') NOT NULL DEFAULT 'chat';--> statement-breakpoint
+ALTER TABLE `threads` ADD `kind` enum('chat','schedule') DEFAULT 'chat' NOT NULL;--> statement-breakpoint
 CREATE INDEX `pending_approvals_status` ON `pending_approvals` (`status`,`created_at`);--> statement-breakpoint
 CREATE INDEX `schedule_runs_schedule` ON `schedule_runs` (`schedule_id`,`started_at`);--> statement-breakpoint
 CREATE INDEX `schedules_due` ON `schedules` (`enabled`,`next_run_at`);

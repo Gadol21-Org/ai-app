@@ -15,6 +15,7 @@ const threadColumns = {
   id: threads.id,
   title: threads.title,
   status: threads.status,
+  kind: threads.kind,
   lastMessageAt: threads.lastMessageAt,
 };
 
@@ -36,10 +37,10 @@ export async function getThread(id: string) {
 }
 
 /** Idempotent: the client may initialize the same thread more than once. */
-export async function createThread(id: string) {
+export async function createThread(id: string, opts: { kind?: "chat" | "schedule"; title?: string } = {}) {
   await getDb()
     .insert(threads)
-    .values({ id })
+    .values({ id, kind: opts.kind ?? "chat", title: opts.title })
     .onDuplicateKeyUpdate({ set: { id } });
 }
 

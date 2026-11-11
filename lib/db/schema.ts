@@ -24,6 +24,8 @@ export const threads = mysqlTable(
     status: mysqlEnum("status", ["regular", "archived", "deleted"])
       .notNull()
       .default("regular"),
+    /** "schedule" threads hold the conversation a scheduled run produced; the sidebar lists them apart. */
+    kind: mysqlEnum("kind", ["chat", "schedule"]).notNull().default("chat"),
     createdAt: createdAt(),
     lastMessageAt: timestamp("last_message_at", { fsp: 3 }).notNull().defaultNow(),
   },
@@ -95,6 +97,8 @@ export const scheduleRuns = mysqlTable(
     id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
     scheduleId: varchar("schedule_id", { length: 36 }).notNull(),
     status: mysqlEnum("status", ["running", "success", "error", "awaiting_approval"]).notNull(),
+    /** The conversation this run produced (shown in the sidebar's Scheduled tab). */
+    threadId: varchar("thread_id", { length: 64 }),
     output: text("output"),
     error: text("error"),
     startedAt: timestamp("started_at", { fsp: 3 }).notNull().defaultNow(),

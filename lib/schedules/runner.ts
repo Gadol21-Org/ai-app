@@ -4,6 +4,8 @@ import { createPendingApproval } from "@/lib/approvals/pending";
 import { getChatModel, getChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { getScheduledRunTools, getToolApproval } from "@/lib/tools";
+import { formatDateTime } from "@/lib/format";
+import { createThread, upsertMessage } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
 import {
   claimDueSchedules,
@@ -20,7 +22,30 @@ const RUN_TIMEOUT_MS = 5 * 60_000;
 
 /** Runs one schedule's prompt through the agent and records the outcome. Never throws. */
 export async function runSchedule(schedule: Schedule) {
-  const runId = await startRun(schedule.id);
+  // Every run is saved as a conversation (shown in the sidebar's Scheduled tab), stored in the
+  // same format the chat uses so it opens, and can be continued, like any other chat.
+  const threadId = crypto.randomUUID();
+  const userMessageId = crypto.randomUUID();
+  const reply = (text: string) =>
+    upsertMessage(threadId, {
+      id: crypto.randomUUID(),
+      parent_id: userMessageId,
+      format: "ai-sdk/v6",
+      content: { role: "assistant", parts: [{ type: "step-start" }, { type: "text", text }] },
+    });
+  const runId = await (async () => {
+    await createThread(threadId, {
+      kind: "schedule",
+      title: `${schedule.title} (${formatDateTime(new Date(), schedule.timezone)})`,
+    });
+    await upsertMessage(threadId, {
+      id: userMessageId,
+      parent_id: null,
+      format: "ai-sdk/v6",
+      content: { role: "user", parts: [{ type: "text", text: schedule.prompt }], metadata: { custom: {} } },
+    });
+    return startRun(schedule.id, threadId);
+  })();
   try {
     const tools = getScheduledRunTools();
     const result = await generateText({
@@ -35,7 +60,7 @@ export async function runSchedule(schedule: Schedule) {
       stopWhen: isStepCount(10),
     });
     await recordUsage({
-      threadId: null,
+      threadId,
       kind: "schedule",
       modelId: getChatModelId(),
       usage: result.totalUsage,
@@ -55,12 +80,18 @@ export async function runSchedule(schedule: Schedule) {
         input: request.toolCall.input,
       });
     }
+    await reply(
+      result.text ||
+        (requests.length > 0 ? "This run needs your approval before it can continue." : "(No reply.)"),
+    );
     await finishRun(runId, schedule.id, {
       status: requests.length > 0 ? "awaiting_approval" : "success",
       output: result.text,
     });
   } catch (error) {
     console.error(`scheduled run "${schedule.title}" failed`, error);
+    const message = error instanceof Error ? error.message : String(error);
+    await reply(`This scheduled run failed: ${message}`).catch(() => {});
     await finishRun(runId, schedule.id, {
       status: "error",
       error: error instanceof Error ? error.message : String(error),
@@ -77,7 +108,7 @@ export async function runDueSchedules() {
 export async function runScheduleNow(id: string) {
   const schedule = await getSchedule(id);
   if (!schedule) return false;
-  void runSchedule(schedule);
+  void runSchedule(schedule).catch((error) => console.error("run now failed", error));
   return true;
 }
 

@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "51fb813e-d3a8-452f-8535-28dc7cb1abe1",
+  "id": "b15442e5-773b-4d43-b721-e855b8350239",
   "prevId": "2957baf1-8687-4c81-ae2f-d954cc944e53",
   "tables": {
     "messages": {
@@ -202,6 +202,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "thread_id": {
+          "name": "thread_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "output": {
           "name": "output",
           "type": "text",
@@ -390,6 +397,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'regular'"
+        },
+        "kind": {
+          "name": "kind",
+          "type": "enum('chat','schedule')",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'chat'"
         },
         "created_at": {
           "name": "created_at",

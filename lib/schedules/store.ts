@@ -103,10 +103,10 @@ export async function claimDueSchedules(now = new Date()): Promise<Schedule[]> {
   return claimed;
 }
 
-export async function startRun(scheduleId: string) {
+export async function startRun(scheduleId: string, threadId: string) {
   const db = getDb();
   await db.update(schedules).set({ lastRunAt: new Date() }).where(eq(schedules.id, scheduleId));
-  const [res] = await db.insert(scheduleRuns).values({ scheduleId, status: "running" });
+  const [res] = await db.insert(scheduleRuns).values({ scheduleId, threadId, status: "running" });
   return (res as unknown as { insertId: number }).insertId;
 }
 
