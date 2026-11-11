@@ -30,13 +30,19 @@ type ThreadRow = {
   id: string;
   title: string | null;
   status: "regular" | "archived";
+  kind: "chat" | "schedule";
   lastMessageAt: string;
 };
+
+/** `externalId` of threads created by a scheduled run. */
+export const SCHEDULE_THREAD = "schedule";
 
 const toMetadata = (t: ThreadRow) => ({
   remoteId: t.id,
   status: t.status,
   title: t.title ?? undefined,
+  // The sidebar tells scheduled conversations apart by this marker.
+  externalId: t.kind === "schedule" ? SCHEDULE_THREAD : undefined,
   lastMessageAt: new Date(t.lastMessageAt),
 });
 

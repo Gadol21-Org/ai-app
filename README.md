@@ -53,6 +53,25 @@ Every model call is recorded with its token counts and a cost computed from the 
 30 days, all time, and a per-conversation breakdown. The numbers are estimates from list prices;
 when a model or price changes, update `lib/pricing.ts` (a model without an entry is recorded at $0).
 
+## Scheduled prompts
+
+The agent can run a saved prompt later, once or on a repeat (`lib/schedules/`). Ask it in a chat
+("every weekday at 8, summarize..."); the `add_schedule` tool shows you the title, time and full
+prompt and only saves after you tap Allow. It can also list schedules (`list_schedules`) and delete one (`delete_schedule`, which shows the schedule and asks first). Manage them at Settings → Scheduled prompts (disable,
+delete, run now, last result). Every run is also saved as a conversation, listed under the
+sidebar's **Scheduled** tab, where you can open it and reply. If you type a message instead of
+tapping Allow/Deny on an approval card, that counts as Deny.
+
+- Stored in MySQL (`schedules`, `schedule_runs`); a poller checks every 30 s, so schedules survive
+  restarts and a firing missed during downtime runs once on startup. Repeats use cron expressions
+  ([croner](https://github.com/Hexagon/croner)) in `SCHEDULE_TIMEZONE`.
+- Tools live in `lib/tools.ts`, which also says which need approval and which scheduled runs may use.
+  Scheduled runs cannot add schedules.
+- Push notifications are not built. A scheduled run that reaches a tool needing approval is parked
+  as a `pending_approvals` row, the run is marked "awaiting approval", and
+  `getNotifier().notifyPendingApproval()` is called (`lib/approvals/notifier.ts`, a no-op today).
+  Implement `Notifier` and call `setNotifier()` at startup to add push.
+
 ## Deployment
 
 Same approach as budget-tracking: every push to `main` builds a Docker image, pushes it to the

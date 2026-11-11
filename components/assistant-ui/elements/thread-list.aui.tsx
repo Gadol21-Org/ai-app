@@ -22,8 +22,10 @@ import {
   TrashIcon,
 } from "lucide-react";
 import {
+  createContext,
   forwardRef,
   Fragment,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -33,18 +35,49 @@ import {
   type FC,
 } from "react";
 
+export type ThreadTab = "chats" | "scheduled";
+
+/** Conversations created by a scheduled run carry this externalId (see lib/chat-storage.ts). */
+const isScheduledItem = (item: { externalId?: string | undefined }) =>
+  item.externalId === "schedule";
+
+const TabContext = createContext<ThreadTab>("chats");
+
 export const ThreadList: FC = () => {
   const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<ThreadTab>("chats");
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
+  const scheduledCount = useAuiState(
+    (s) => s.threads.threadItems.filter(isScheduledItem).length,
+  );
 
   return (
-    <ThreadListRoot>
-      <ThreadListNew />
-      {hasThreads && (
-        <ThreadListSearch value={search} onValueChange={setSearch} />
-      )}
-      <ThreadListItems searchQuery={hasThreads ? search : ""} />
-    </ThreadListRoot>
+    <TabContext.Provider value={tab}>
+      <ThreadListRoot>
+        <div role="tablist" className="bg-muted mb-1 grid grid-cols-2 gap-1 rounded-lg p-0.5">
+          {(["chats", "scheduled"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={cn(
+                "h-7 rounded-md text-sm font-medium transition-colors",
+                tab === t ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t === "chats" ? "Chats" : `Scheduled${scheduledCount ? ` (${scheduledCount})` : ""}`}
+            </button>
+          ))}
+        </div>
+        {tab === "chats" && <ThreadListNew />}
+        {hasThreads && (
+          <ThreadListSearch value={search} onValueChange={setSearch} />
+        )}
+        <ThreadListItems searchQuery={hasThreads ? search : ""} />
+      </ThreadListRoot>
+    </TabContext.Provider>
   );
 };
 
@@ -160,7 +193,7 @@ export type ThreadListGroup = { label: string; indices: number[] };
  * or while the local day start is unknown during server render and hydration,
  * in which case `filteredIndices` keeps the runtime order.
  */
-export const useThreadListGroups = (searchQuery = "") => {
+export const useThreadListGroups = (searchQuery = "", tab: ThreadTab = "chats") => {
   const threadIds = useAuiState((s) => s.threads.threadIds);
   const threadItems = useAuiState((s) => s.threads.threadItems);
 
@@ -172,6 +205,11 @@ export const useThreadListGroups = (searchQuery = "") => {
     const dates = threadIds.map((id) => itemsById.get(id)?.lastMessageAt);
     const filteredIndices = threadIds
       .map((id, index) => ({ id, index }))
+      .filter(({ id }) => {
+        const item = itemsById.get(id);
+        // A chat that is not saved yet has no row, so it belongs with the chats.
+        return tab === "scheduled" ? !!item && isScheduledItem(item) : !item || !isScheduledItem(item);
+      })
       .filter(
         ({ id }) =>
           !query ||
@@ -209,15 +247,25 @@ export const useThreadListGroups = (searchQuery = "") => {
       }
     }
     return { threadIds, filteredIndices, groups: result };
-  }, [threadIds, threadItems, query, startOfToday]);
+  }, [threadIds, threadItems, query, startOfToday, tab]);
 };
 
 const ThreadListItemGroups: FC<{ searchQuery?: string }> = ({
   searchQuery = "",
 }) => {
-  const { threadIds, filteredIndices, groups } =
-    useThreadListGroups(searchQuery);
+  const tab = useContext(TabContext);
+  const { threadIds, filteredIndices, groups } = useThreadListGroups(searchQuery, tab);
   const query = searchQuery.trim();
+
+  if (tab === "scheduled" && filteredIndices.length === 0) {
+    return (
+      <div className="text-muted-foreground px-2.5 py-4 text-sm">
+        {query
+          ? "No threads found"
+          : "Nothing yet. Each scheduled run appears here as a conversation."}
+      </div>
+    );
+  }
 
   if (query && filteredIndices.length === 0) {
     return (

@@ -7,6 +7,9 @@ export async function register() {
   await migrate(getDb(), { migrationsFolder: "./drizzle" });
   console.log("database migrations applied");
 
+  const { startScheduler } = await import("@/lib/schedules/runner");
+  await startScheduler();
+
   const { purgeExpiredThreads, retentionDays } = await import("@/lib/retention");
   const purge = async () => {
     try {
