@@ -68,6 +68,7 @@ the variables below set the app starts normally and just has no extra tools. A s
 |---|---|
 | `WANDERLOG_COOKIE` | Enables the Wanderlog tools (trips, places, notes, hotels, checklists, expenses). The value of the `connect.sid` cookie of a logged-in session on wanderlog.com. |
 | `MCP_SERVERS` | Optional JSON for more servers, one line: `{"name":{"url":"https://host/mcp","headers":{"Authorization":"Bearer ..."}}}` for a remote server, or `{"name":{"command":"node","args":["server.js"],"env":{"KEY":"value"}}}` for a local process. |
+| `MCP_SERVERS` approval | Each server in `MCP_SERVERS` may add `"requireApproval"`: `"all"` (default: a person must allow every call), `"none"`, or a list of regexes matched against tool names. |
 | `MCP_MAX_RESULT_CHARS` | Tool results longer than this (default `8000`) are truncated before they reach the chat, the database and the model. |
 
 ### Wanderlog
@@ -77,6 +78,8 @@ server (MIT, the most used and maintained of the ones on GitHub; **unofficial**,
 in `mcp-servers/package-lock.json`, installed in the Docker image without install scripts, and only talks to
 `wanderlog.com`. Things to know:
 
+- Reading and adding (trips, places, notes...) run without asking. Tools that remove, edit, update, rename or move
+  things show the usual approval card first. Scheduled runs don't get MCP tools.
 - It signs in with your **session cookie**, which gives the same access as your login (including editing and deleting
   trips). Keep it only in the `AI_APP_ENV` secret. Only that one variable is passed to the server process.
 - To get it: log in at wanderlog.com, open DevTools > Application > Cookies > `https://wanderlog.com`, copy the
