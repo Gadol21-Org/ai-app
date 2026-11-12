@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, CalendarClock, ChevronLeft } from "lucide-react";
+import { ArrowRight, Bell, CalendarClock, ChevronLeft, Clapperboard } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -86,6 +86,18 @@ export default async function SettingsPage() {
             <div className="text-muted-foreground text-sm">
               {t.settings.scheduledLinkDesc}
             </div>
+          </div>
+          <ChevronLeft className="text-muted-foreground size-4 shrink-0" />
+        </Link>
+
+        <Link
+          href="/settings/media"
+          className="hover:bg-muted/50 flex items-center gap-3 rounded-lg border p-4 transition-colors"
+        >
+          <Clapperboard className="text-muted-foreground size-5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">{t.mediaLibrary.pageTitle}</div>
+            <div className="text-muted-foreground text-sm">{t.mediaLibrary.linkDesc}</div>
           </div>
           <ChevronLeft className="text-muted-foreground size-4 shrink-0" />
         </Link>
