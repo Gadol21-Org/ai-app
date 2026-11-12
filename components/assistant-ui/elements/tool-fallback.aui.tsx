@@ -38,7 +38,7 @@ import {
 } from "./collapsible-root";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { t } from "@/lib/i18n";
+import { t, toolDisplayName } from "@/lib/i18n";
 
 const ANIMATION_DURATION = 200;
 
@@ -196,7 +196,7 @@ function ToolFallbackTrigger({
           isRunning && "shimmer motion-reduce:animate-none",
         )}
       >
-        {label}: <b>{toolName}</b>
+        {label}: <b>{toolDisplayName(toolName)}</b>
       </span>
       <ToolFallbackDuration />
       <ChevronDownIcon
