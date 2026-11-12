@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   if (newest && !notes.has(newest.id)) {
     const note = `Current time: ${describeNow(scheduleTimezone())}.\n${describeSpeaker(user)}`;
     notes.set(newest.id, note);
-    if (threadId) await saveTurnContext(threadId, newest.id, note).catch(() => {});
+    if (threadId) await saveTurnContext(threadId, newest.id, note, user.id).catch(() => {});
   }
 
   const result = streamText({

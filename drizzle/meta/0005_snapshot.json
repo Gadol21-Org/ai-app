@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "117f9335-839f-41c9-8970-1eb33c6ada05",
+  "id": "f21c0b70-ee6f-42fe-b686-e3e145189b3c",
   "prevId": "9c82580f-c9d9-44fe-a25e-c9b5baccc954",
   "tables": {
     "messages": {
@@ -640,6 +640,13 @@
           "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "varchar(36)",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "note": {

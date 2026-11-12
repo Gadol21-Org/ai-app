@@ -62,6 +62,9 @@ export const turnContexts = mysqlTable(
   {
     threadId: varchar("thread_id", { length: 64 }).notNull(),
     messageId: varchar("message_id", { length: 64 }).notNull(),
+    /** Who wrote the message (null for a scheduled run). created_at is when it was sent. */
+    userId: varchar("user_id", { length: 36 }),
+    /** Exactly what the model saw, kept as text so replaying it can never drift. */
     note: text("note").notNull(),
     createdAt: createdAt(),
   },
