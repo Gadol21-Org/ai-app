@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "5",
-      "when": 1794455444855,
-      "tag": "0002_thread_allowed_tools",
+      "when": 1794455907321,
+      "tag": "0002_thread_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1794456660130,
+      "tag": "0003_thread_allowed_tools",
       "breakpoints": true
     }
   ]

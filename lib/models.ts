@@ -1,5 +1,6 @@
 import { google } from "@ai-sdk/google";
 import type { LanguageModel } from "ai";
+import { DEFAULT_CHAT_MODEL, isSelectableModel } from "@/lib/model-catalog";
 
 /**
  * Single place that decides which model answers a chat request.
@@ -12,9 +13,10 @@ const providers: Record<string, (modelId: string) => LanguageModel> = {
   google: (modelId) => google(modelId),
 };
 
-export const DEFAULT_CHAT_MODEL = "google:gemini-3.8-flash";
-
-/** The configured `provider:model` id; also the key used for pricing and spend records. */
+/**
+ * The default `provider:model` id (CHAT_MODEL overrides it). Used for new conversations, titles and
+ * scheduled runs; also the key used for pricing and spend records.
+ */
 export function getChatModelId() {
   return process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL;
 }
@@ -28,4 +30,9 @@ export function getChatModel(spec = getChatModelId()) {
     );
   }
   return create(rest.join(":"));
+}
+
+/** The model for a chat request: the person's pick when it is a known option, else the default. */
+export function resolveChatModelId(requested?: unknown) {
+  return isSelectableModel(requested) ? requested : getChatModelId();
 }

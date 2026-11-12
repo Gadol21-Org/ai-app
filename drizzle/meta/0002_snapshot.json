@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "e868b04e-9953-465d-8825-43f0311c07c1",
+  "id": "750d7292-bf36-425b-a014-90e735f7ad25",
   "prevId": "b15442e5-773b-4d43-b721-e855b8350239",
   "tables": {
     "messages": {
@@ -406,9 +406,9 @@
           "autoincrement": false,
           "default": "'chat'"
         },
-        "allowed_tools": {
-          "name": "allowed_tools",
-          "type": "json",
+        "model": {
+          "name": "model",
+          "type": "varchar(128)",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

@@ -37,7 +37,7 @@ This is the same VM, deploy key and `cloudflared` tunnel as budget-tracking, so 
 ```
 GOOGLE_GENERATIVE_AI_API_KEY=...
 MYSQL_URL=mysql://ai_app:<password>@<db-private-ip>:3306/ai_app
-# CHAT_MODEL=google:gemini-3.8-flash
+# CHAT_MODEL=google:gemini-3.5-flash-lite
 WANDERLOG_COOKIE=s%3A...
 ```
 
