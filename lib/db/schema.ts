@@ -53,24 +53,6 @@ export const messages = mysqlTable(
   (t) => [uniqueIndex("messages_thread_id").on(t.threadId, t.id)],
 );
 
-/**
- * The exact "who and when" block sent to the model with a user message. It is replayed on every
- * later turn so the history is re-sent byte-identical and the provider's prompt cache keeps hitting.
- */
-export const turnContexts = mysqlTable(
-  "turn_contexts",
-  {
-    threadId: varchar("thread_id", { length: 64 }).notNull(),
-    messageId: varchar("message_id", { length: 64 }).notNull(),
-    /** Who wrote the message (null for a scheduled run). created_at is when it was sent. */
-    userId: varchar("user_id", { length: 36 }),
-    /** Exactly what the model saw, kept as text so replaying it can never drift. */
-    note: text("note").notNull(),
-    createdAt: createdAt(),
-  },
-  (t) => [uniqueIndex("turn_contexts_thread_message").on(t.threadId, t.messageId)],
-);
-
 /** One row per model call. Cost is fixed at write time from lib/pricing.ts. */
 export const usageEvents = mysqlTable(
   "usage_events",

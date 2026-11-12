@@ -2,7 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
-const { threads, messages, turnContexts } = schema;
+const { threads, messages } = schema;
 
 export type StoredMessage = {
   id: string;
@@ -123,39 +123,4 @@ export async function allowToolInThread(id: string, toolName: string) {
     .update(threads)
     .set({ allowedTools: [...current, toolName] })
     .where(eq(threads.id, id));
-}
-
-/** Notes already sent with this conversation's user messages, by message id. */
-export async function getTurnContexts(threadId: string): Promise<Map<string, string>> {
-  const rows = await getDb()
-    .select({ messageId: turnContexts.messageId, note: turnContexts.note })
-    .from(turnContexts)
-    .where(eq(turnContexts.threadId, threadId));
-  return new Map(rows.map((r) => [r.messageId, r.note]));
-}
-
-/** Keeps the first note a message got: later turns must replay exactly what was sent before. */
-export async function saveTurnContext(
-  threadId: string,
-  messageId: string,
-  note: string,
-  userId: string | null,
-) {
-  await getDb()
-    .insert(turnContexts)
-    .values({ threadId, messageId, note, userId })
-    .onDuplicateKeyUpdate({ set: { note: sql`${turnContexts.note}` } });
-}
-
-/** Who wrote each user message and when, for showing it in the UI (not used by the client yet). */
-export async function getMessageAuthors(threadId: string) {
-  const rows = await getDb()
-    .select({
-      messageId: turnContexts.messageId,
-      userId: turnContexts.userId,
-      sentAt: turnContexts.createdAt,
-    })
-    .from(turnContexts)
-    .where(eq(turnContexts.threadId, threadId));
-  return new Map(rows.map((r) => [r.messageId, { userId: r.userId, sentAt: r.sentAt }]));
 }

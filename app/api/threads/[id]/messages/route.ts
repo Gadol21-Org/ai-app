@@ -1,6 +1,5 @@
 import {
   deleteMessages,
-  getMessageAuthors,
   listMessages,
   upsertMessage,
   type StoredMessage,
@@ -11,10 +10,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(req: Request, { params }: Ctx) {
   const format = new URL(req.url).searchParams.get("format") ?? "";
-  const { id } = await params;
-  const [rows, authors] = await Promise.all([listMessages(id, format), getMessageAuthors(id)]);
-  // `author` ({ userId, sentAt }) is there for the UI to show who wrote a message and when.
-  return Response.json({ messages: rows.map((m) => ({ ...m, author: authors.get(m.id) ?? null })) });
+  return Response.json({ messages: await listMessages((await params).id, format) });
 }
 
 /** Append or update one message. */

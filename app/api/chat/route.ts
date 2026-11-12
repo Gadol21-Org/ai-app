@@ -4,9 +4,9 @@ import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getToolApproval } from "@/lib/tools";
-import { getAllowedTools, getTurnContexts, saveTurnContext, updateThread } from "@/lib/threads";
+import { getAllowedTools, updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
-import { TURN_CONTEXT_INSTRUCTIONS, describeSpeaker, withTurnContexts } from "@/lib/turn-context";
+import { TURN_CONTEXT_INSTRUCTIONS, TURN_CONTEXT_KEY, describeSpeaker, withTurnContexts } from "@/lib/turn-context";
 
 export const maxDuration = 60;
 
@@ -46,15 +46,13 @@ export async function POST(req: Request) {
   const tools = await getChatTools(threadId);
   const allowedTools = threadId ? await getAllowedTools(threadId) : [];
 
-  // Each user message keeps the note it was first sent with, so the history stays byte-identical
-  // from turn to turn (prompt cache). Only the newest message gets a fresh note.
-  const notes = threadId ? await getTurnContexts(threadId) : new Map<string, string>();
-  const newest = messages.findLast((m) => m.role === "user");
-  if (newest && !notes.has(newest.id)) {
-    const note = `Current time: ${describeNow(scheduleTimezone())}.\n${describeSpeaker(user)}`;
-    notes.set(newest.id, note);
-    if (threadId) await saveTurnContext(threadId, newest.id, note, user.id).catch(() => {});
-  }
+  // Who is writing and when. Older messages replay the note they were first sent with (it rides
+  // on the metadata of each reply), so the history stays byte-identical for the prompt cache.
+  const { messages: withContext, current } = withTurnContexts(denyUnansweredApprovals(messages), {
+    userId: user.id,
+    sentAt: new Date().toISOString(),
+    note: `Current time: ${describeNow(scheduleTimezone())}.\n${describeSpeaker(user)}`,
+  });
 
   const result = streamText({
     abortSignal: req.signal,
@@ -64,7 +62,7 @@ export async function POST(req: Request) {
     messages: pruneMessages({
       // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
       messages: await convertToModelMessages(
-        withTurnContexts(denyUnansweredApprovals(messages), notes),
+        withContext,
       ),
       toolCalls: "before-last-4-messages",
     }),
@@ -83,6 +81,9 @@ export async function POST(req: Request) {
   });
 
   return result.toUIMessageStreamResponse({
+    // Saved with the reply by the browser, and sent back with the history on later turns.
+    messageMetadata: ({ part }) =>
+      part.type === "start" ? { [TURN_CONTEXT_KEY]: current } : undefined,
     onError: (error) =>
       error instanceof Error ? error.message : String(error),
   });
