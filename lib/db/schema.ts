@@ -26,6 +26,8 @@ export const threads = mysqlTable(
       .default("regular"),
     /** "schedule" threads hold the conversation a scheduled run produced; the sidebar lists them apart. */
     kind: mysqlEnum("kind", ["chat", "schedule"]).notNull().default("chat"),
+    /** Tools the person allowed to run without asking for the rest of this conversation. */
+    allowedTools: json("allowed_tools").$type<string[]>(),
     createdAt: createdAt(),
     lastMessageAt: timestamp("last_message_at", { fsp: 3 }).notNull().defaultNow(),
   },

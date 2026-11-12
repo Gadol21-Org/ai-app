@@ -3,6 +3,7 @@ import { getChatModel, getChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getToolApproval } from "@/lib/tools";
+import { getAllowedTools } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
 
 export const maxDuration = 60;
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     await req.json();
 
   const tools = await getChatTools();
+  const allowedTools = threadId ? await getAllowedTools(threadId) : [];
 
   const result = streamText({
     abortSignal: req.signal,
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
       toolCalls: "before-last-4-messages",
     }),
     tools,
-    toolApproval: getToolApproval(tools),
+    toolApproval: getToolApproval(tools, allowedTools),
     // Building a trip means many tool calls in a row.
     stopWhen: isStepCount(10),
     onFinish: ({ totalUsage }) =>

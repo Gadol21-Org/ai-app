@@ -22,14 +22,21 @@ import { t } from "@/lib/i18n";
  */
 
 /**
- * `requireApproval` says which of the server's tools a person must allow before they run:
- * "all" (the default, so a new server is safe), "none", or a list of regular expressions
- * matched against the tool name.
+ * Which of a server's tools a person must allow before they run:
+ *
+ * - `requireApproval`: "all" (the default, so a new server is safe), "none", or a list of
+ *   regular expressions matched against the tool name.
+ * - `allowTools`: an allow list of tools that never ask, applied on top of `requireApproval`.
+ *   Each entry is a tool name, where `*` matches any run of characters
+ *   (e.g. `"wanderlog_get_*"` or `"list_trips"`). Use it to let a server's read-only tools through
+ *   while everything else keeps asking.
+ *
+ * A person can still allow an asking tool for the rest of one conversation from its approval card.
  */
 export type McpServerConfig = (
   | { url: string; headers?: Record<string, string> }
   | { command: string; args?: string[]; env?: Record<string, string> }
-) & { requireApproval?: "all" | "none" | string[] };
+) & { requireApproval?: "all" | "none" | string[]; allowTools?: string[] };
 
 /** Tool results longer than this are cut before they reach the chat, the DB or the model. */
 export const MAX_TOOL_RESULT_CHARS =
@@ -62,6 +69,8 @@ function wanderlogServer(): McpServerConfig | undefined {
     command: process.execPath,
     args: [entry],
     env: { WANDERLOG_COOKIE: cookie },
+    // The read-only tools (get/list/search) run without asking; add/edit/remove/move/... still ask.
+    allowTools: ["wanderlog_get_*", "wanderlog_list_*", "wanderlog_search_*"],
   };
 }
 
@@ -169,10 +178,28 @@ export function mcpToolRequiresApproval(toolName: string): boolean {
   return approvalRequired.has(toolName);
 }
 
-function needsApproval(
+/** Matches a whole tool name against an `allowTools` entry, where `*` stands for any characters. */
+export function matchesToolPattern(toolName: string, pattern: string): boolean {
+  const source = pattern
+    .split("*")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${source}$`, "i").test(toolName);
+}
+
+export function needsApproval(
   toolName: string,
-  rule: McpServerConfig["requireApproval"] = "all",
+  config: Pick<McpServerConfig, "requireApproval" | "allowTools">,
 ): boolean {
+  // A malformed `allowTools` in MCP_SERVERS is ignored, so those tools keep asking.
+  if (
+    Array.isArray(config.allowTools) &&
+    config.allowTools.some(
+      (pattern) => typeof pattern === "string" && matchesToolPattern(toolName, pattern),
+    )
+  )
+    return false;
+  const rule = config.requireApproval ?? "all";
   if (rule === "all") return true;
   if (rule === "none") return false;
   return rule.some((pattern) => new RegExp(pattern, "i").test(toolName));
@@ -190,7 +217,7 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
       try {
         const tools = limitResults(await client.tools()) as ToolSet;
         for (const toolName of Object.keys(tools)) {
-          if (needsApproval(toolName, config.requireApproval))
+          if (needsApproval(toolName, config))
             approvalRequired.add(toolName);
         }
         return { client, tools };
