@@ -148,7 +148,19 @@
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
+@utility h-app {
+  height: 100dvh;
+  height: var(--app-height, 100dvh);
+}
+
 @layer base {
+  html,
+  body {
+    /* The app scrolls inside its own containers; the page itself never moves. */
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   * {
     @apply border-border;
   }
