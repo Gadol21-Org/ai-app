@@ -1,22 +1,22 @@
-import type { ModelMessage } from "ai";
+import type { UIMessage } from "ai";
 
 /**
- * Per-turn facts (the time, who is writing) are attached to the newest user message rather than
- * the system prompt. Model providers cache the longest unchanged prefix of a request; a value that
- * changes every minute at the top of the system prompt would make every turn re-read the whole
- * conversation at full price. The note only exists in the request sent to the model: it is never
- * stored or shown in the chat.
+ * Per-turn facts (the time, who is writing) are attached to the user message they came with, as an
+ * extra <context> text part, rather than to the system prompt. Model providers cache the longest
+ * unchanged prefix of a request, so two things matter:
+ *  - nothing that changes every minute may sit at the top of the system prompt, and
+ *  - once a message has been sent with its note, every later request must send it again with
+ *    the exact same note. Otherwise the history diverges at that message and the cache misses
+ *    from there on. The notes are therefore stored per message (see `turnContexts`) and replayed.
+ * The note is never stored in the chat itself or shown in it.
  */
-export function withTurnContext(messages: ModelMessage[], note: string): ModelMessage[] {
-  const index = messages.findLastIndex((m) => m.role === "user");
-  if (index === -1) return messages;
-  const text = `<context>\n${note}\n</context>`;
-  const target = messages[index] as Extract<ModelMessage, { role: "user" }>;
-  const content =
-    typeof target.content === "string"
-      ? [{ type: "text" as const, text: target.content }, { type: "text" as const, text }]
-      : [...target.content, { type: "text" as const, text }];
-  return messages.map((m, i) => (i === index ? { ...target, content } : m));
+export function withTurnContexts(messages: UIMessage[], notes: Map<string, string>): UIMessage[] {
+  return messages.map((m) => {
+    const note = m.role === "user" ? notes.get(m.id) : undefined;
+    return note === undefined
+      ? m
+      : { ...m, parts: [...m.parts, { type: "text" as const, text: `<context>\n${note}\n</context>` }] };
+  });
 }
 
 /** Tells the model what the context block is, once, in the (constant) system prompt. */
