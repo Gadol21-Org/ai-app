@@ -7,10 +7,11 @@ import type { UIMessage } from "ai";
  */
 export type TurnContext = { userId: string | null; sentAt: string; note: string };
 
-/** Where the context of a user message is kept: on the metadata of the assistant reply to it. */
+/** Where the context of a user message is kept: in that message's own metadata. */
 export const TURN_CONTEXT_KEY = "turnContext";
 
-const contextOf = (m: UIMessage | undefined): TurnContext | undefined => {
+/** The context stored on a message, if it has one. */
+export const contextOf = (m: UIMessage | undefined): TurnContext | undefined => {
   const value = (m?.metadata as Record<string, unknown> | undefined)?.[TURN_CONTEXT_KEY];
   return value && typeof value === "object" && typeof (value as TurnContext).note === "string"
     ? (value as TurnContext)
@@ -18,36 +19,29 @@ const contextOf = (m: UIMessage | undefined): TurnContext | undefined => {
 };
 
 /**
+ * Conversations saved before the context moved onto the user message kept it on the metadata of
+ * the assistant reply that follows. Read it from there when the user message has none, so those
+ * conversations replay the same note they were first sent with.
+ */
+export const contextOfTurn = (user: UIMessage, reply: UIMessage | undefined): TurnContext | undefined =>
+  contextOf(user) ?? (reply?.role === "assistant" ? contextOf(reply) : undefined);
+
+/**
  * Attaches each user message's context to it, as an extra <context> text part, for the request to
  * the model only. It is not part of the system prompt, which must stay constant for the provider's
  * prompt cache, and it must be re-sent byte-identical on every later turn, or the history would
- * diverge at that message and the cache would miss from there on.
- *
- * The server writes the context into the metadata of the assistant reply it streams (see the chat
- * route). The browser saves that reply as usual and sends it back with the history, so older
- * messages get exactly the note they were first sent with. No extra storage, and the person never
- * sees the note in the chat. The newest user message, which has no reply yet, gets `fresh`. A turn
- * continued after a tool approval already has a reply, so it keeps its original note.
- *
- * Returns the messages and the context of the newest user message, which the reply must carry.
+ * diverge at that message and the cache would miss from there on. That is why the server saves the
+ * context with the message when it first arrives and replays that stored note, never a fresh one.
+ * The person never sees the note in the chat. A message without a context is sent as it is.
  */
-export function withTurnContexts(
-  messages: UIMessage[],
-  fresh: TurnContext,
-): { messages: UIMessage[]; current: TurnContext } {
-  let current = fresh;
-  const lastUser = messages.findLastIndex((m) => m.role === "user");
-  const out = messages.map((m, i) => {
+export function withTurnContexts(messages: UIMessage[]): UIMessage[] {
+  return messages.map((m, i) => {
     if (m.role !== "user") return m;
-    const reply = messages[i + 1];
-    const stored = reply?.role === "assistant" ? contextOf(reply) : undefined;
-    const context = stored ?? (i === lastUser ? fresh : undefined);
-    if (i === lastUser && context) current = context;
+    const context = contextOfTurn(m, messages[i + 1]);
     if (!context) return m;
     const text = `<context>\n${context.note}\n</context>`;
     return { ...m, parts: [...m.parts, { type: "text" as const, text }] };
   });
-  return { messages: out, current };
 }
 
 /** Tells the model what the context block is, once, in the (constant) system prompt. */

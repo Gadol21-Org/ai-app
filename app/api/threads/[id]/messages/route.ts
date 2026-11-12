@@ -1,26 +1,11 @@
-import {
-  deleteMessages,
-  listMessages,
-  upsertMessage,
-  type StoredMessage,
-} from "@/lib/threads";
-import { t } from "@/lib/i18n";
+import { deleteMessages, listMessages } from "@/lib/threads";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+/** The browser only reads history here; the chat endpoint is the one that writes messages. */
 export async function GET(req: Request, { params }: Ctx) {
   const format = new URL(req.url).searchParams.get("format") ?? "";
   return Response.json({ messages: await listMessages((await params).id, format) });
-}
-
-/** Append or update one message. */
-export async function PUT(req: Request, { params }: Ctx) {
-  const message: StoredMessage = await req.json();
-  if (typeof message?.id !== "string" || typeof message?.format !== "string") {
-    return Response.json({ error: t.errors.invalidMessage }, { status: 400 });
-  }
-  await upsertMessage((await params).id, message);
-  return Response.json({ ok: true });
 }
 
 export async function DELETE(req: Request, { params }: Ctx) {

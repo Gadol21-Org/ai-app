@@ -1,4 +1,5 @@
 import "server-only";
+import type { UIMessage } from "ai";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
@@ -97,6 +98,43 @@ export async function upsertMessage(threadId: string, m: StoredMessage) {
     .update(threads)
     .set({ lastMessageAt: sql`now(3)` })
     .where(eq(threads.id, threadId));
+}
+
+/** The one format the chat runtime and the server both read and write. */
+export const MESSAGE_FORMAT = "ai-sdk/v6";
+
+/** Messages are stored without their id (it is the row's id), as the chat runtime expects. */
+export function toUIMessage(m: StoredMessage): UIMessage {
+  return { id: m.id, ...m.content } as UIMessage;
+}
+
+/** Saves a chat message (insert, or overwrite when the id exists). Used by chat turns and scheduled runs alike. */
+export function saveUIMessage(threadId: string, message: UIMessage, parentId: string | null) {
+  const { id, ...content } = message;
+  return upsertMessage(threadId, { id, parent_id: parentId, format: MESSAGE_FORMAT, content });
+}
+
+/** Every stored message of the thread (all branches), oldest first. */
+export function listUIMessages(threadId: string) {
+  return listMessages(threadId, MESSAGE_FORMAT);
+}
+
+/**
+ * The conversation as the model should see it: the messages from the root down to `headId`,
+ * following parent links, so edited and regenerated branches never leak into each other.
+ * Returns undefined when `headId` is not in the thread.
+ */
+export function pickBranch(all: StoredMessage[], headId: string | null): StoredMessage[] | undefined {
+  if (headId === null) return [];
+  const byId = new Map(all.map((m) => [m.id, m]));
+  const branch: StoredMessage[] = [];
+  const seen = new Set<string>();
+  for (let cur = byId.get(headId); cur; cur = cur.parent_id ? byId.get(cur.parent_id) : undefined) {
+    if (seen.has(cur.id)) break;
+    seen.add(cur.id);
+    branch.unshift(cur);
+  }
+  return branch.length > 0 ? branch : undefined;
 }
 
 export async function deleteMessages(threadId: string, ids: string[]) {
