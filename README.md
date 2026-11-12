@@ -83,8 +83,8 @@ finishing renders).
 The flow, which the model follows on its own from a prompt like "make a 25-second ad for X":
 
 1. The model writes the spoken script and the presenter description.
-2. `list_voices`, then `generate_speech` turns the script into audio (ElevenLabs text to speech, **Eleven v3** by
-   default, which supports Hebrew and audio tags like `[excited]`). Scribe is ElevenLabs' speech-to-text model, so
+2. `list_voices`, then `generate_speech` turns the script into audio (ElevenLabs **Eleven v4**, its best speech model, which supports Hebrew and audio tags like `[excited]`; v4 is
+   served by the text-to-dialogue endpoint, older models by the flows speech endpoint). Scribe is ElevenLabs' speech-to-text model, so
    it is not used here.
 3. `generate_image` makes the presenter picture (9:16 for Reels/Stories); `list_media` reuses an earlier one so ads look
    consistent.
@@ -94,12 +94,14 @@ The flow, which the model follows on its own from a prompt like "make a 25-secon
    from a single prompt. Good for short b-roll; the voice can't be chosen and lip-sync quality is less predictable.
 
 ElevenLabs' separate Avatars product has no API yet, so the two-step flow above is what is available as a single
-pipeline. Speech and images are cheap and run without asking; **the two video tools always ask for approval**
-(they cost the most), and they are not given to scheduled runs, which have nobody to ask. A scheduled "ad" prompt
-therefore prepares the script, speech and image and notifies you; you open its conversation (sidebar **Scheduled**),
-reply "approve", and approve the video card there. Example schedule prompt: "Write a 25-second Hebrew video ad
-script for <business/offer>, generate the speech with a warm female voice and a 9:16 presenter image, then send me
-a notification and list the media ids and the script in your reply."
+pipeline. **Speech and both video tools always ask for approval** (the card shows the script); images run without
+asking. Scheduled runs have nobody to ask (and a parked approval can't be resumed yet), so they only get the
+unapproved tools: a scheduled "ad" prompt writes the script, may make the presenter image, and notifies you. You open
+its conversation (sidebar **Scheduled**), reply "continue", and approve the speech and video cards there. Example
+schedule prompt: "Write a 25-second Hebrew video ad script for <business/offer>, generate a 9:16 presenter image, then
+send me a notification and list the media ids and the full script in your reply."
+
+Speech, images and videos show up as players right in the chat (a video still rendering updates itself when done).
 
 Files (audio, images, MP4) are stored in MySQL (`media` table, `LONGBLOB`), because the container has no persistent
 disk. **Settings → Media library** plays, downloads and deletes them. Keep an eye on the size there, as the

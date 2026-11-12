@@ -2,6 +2,7 @@
 
 import { DownloadIcon, LoaderIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +15,27 @@ export type MediaPreviewProps = {
 };
 
 /** Shows a stored file (audio, image or video) with a download link; also used inside chat tool cards. */
-export function MediaPreview({ id, kind, status, title, className }: MediaPreviewProps) {
+export function MediaPreview({ id, kind, status: initialStatus, title, className }: MediaPreviewProps) {
+  // A video still rendering when the chat saved it: ask the server until it is ready or failed.
+  const [status, setStatus] = useState(initialStatus);
+  useEffect(() => {
+    setStatus(initialStatus);
+    if (initialStatus !== "generating") return;
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/media/${id}/status`, { cache: "no-store" });
+        const next = res.ok ? ((await res.json()) as { status: MediaPreviewProps["status"] }).status : undefined;
+        if (!stopped && next && next !== "generating") return setStatus(next);
+      } catch {}
+      if (!stopped) timer = setTimeout(poll, 8000);
+    };
+    let timer = setTimeout(poll, 3000);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [id, initialStatus]);
   const src = `/api/media/${id}`;
   if (status === "generating")
     return (

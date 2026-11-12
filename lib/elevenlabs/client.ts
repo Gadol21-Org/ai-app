@@ -105,3 +105,29 @@ export async function generateAndWait(
   }
   throw new ElevenLabsError("ElevenLabs took too long to answer. Try again.");
 }
+
+/**
+ * Speech with Eleven v4 (and v3). v4 is served by the text-to-dialogue endpoint, which answers
+ * synchronously with the audio itself; one input is plain single-voice speech.
+ */
+export async function synthesizeDialogue(opts: {
+  text: string;
+  voiceId: string;
+  model: string;
+  languageCode?: string;
+}): Promise<{ data: Buffer; mimeType: string }> {
+  const key = process.env.ELEVENLABS_API_KEY?.trim();
+  if (!key) throw new ElevenLabsError("ELEVENLABS_API_KEY is not set.");
+  const res = await fetch(`${baseUrl()}/v1/text-to-dialogue?output_format=mp3_44100_128`, {
+    method: "POST",
+    headers: { "xi-api-key": key, "content-type": "application/json" },
+    body: JSON.stringify({
+      model_id: opts.model,
+      inputs: [{ text: opts.text, voice_id: opts.voiceId }],
+      ...(opts.languageCode ? { language_code: opts.languageCode } : {}),
+    }),
+    signal: AbortSignal.timeout(90_000),
+  });
+  if (!res.ok) throw new ElevenLabsError(describeError(res.status, await res.text()));
+  return { data: Buffer.from(await res.arrayBuffer()), mimeType: "audio/mpeg" };
+}

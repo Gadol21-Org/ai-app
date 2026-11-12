@@ -3,22 +3,22 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { t } from "@/lib/i18n";
 import { getMedia, listMedia, mediaUrl, saveMedia, startMedia } from "@/lib/media/store";
-import { generateAndWait, isElevenLabsConfigured, searchVoices, startGeneration } from "./client";
+import { generateAndWait, isElevenLabsConfigured, searchVoices, startGeneration, synthesizeDialogue } from "./client";
 
 /**
  * Tools for making video ads with ElevenLabs. The pipeline the model follows:
- *   write the spoken script -> generate_speech -> generate_image (the presenter) ->
- *   generate_talking_video (presenter + speech -> lip-synced video), which needs approval.
+ *   write the spoken script -> generate_speech (asks first) -> generate_image (the presenter) ->
+ *   generate_talking_video (presenter + speech -> lip-synced video, asks first).
  * `generate_scene_video` is the one-step alternative (a Veo clip with its own speech and sound).
  * Everything is stored in the media library (Settings > Media) and referred to by id.
  */
 
 export type AdToolContext = { threadId?: string };
 
-const TTS_MODELS = ["eleven_v3", "eleven_multilingual_v2", "eleven_flash_v2_5"] as const;
+const TTS_MODELS = ["eleven_v4", "eleven_v3", "eleven_multilingual_v2", "eleven_flash_v2_5"] as const;
 const ttsModel = () => {
   const configured = process.env.ELEVENLABS_TTS_MODEL?.trim();
-  return (TTS_MODELS as readonly string[]).includes(configured ?? "") ? configured! : "eleven_v3";
+  return (TTS_MODELS as readonly string[]).includes(configured ?? "") ? configured! : "eleven_v4";
 };
 const IMAGE_MODEL = () => process.env.ELEVENLABS_IMAGE_MODEL?.trim() || "gemini-3.1-flash-image";
 const LIPSYNC_MODEL = "creatify-aurora";
@@ -59,23 +59,28 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
   const generateSpeech = tool({
     description:
       "Turn a script into spoken audio with ElevenLabs text to speech and save it to the media library. " +
-      "Returns a mediaId to pass to generate_talking_video. Write only what is spoken: no stage directions, no emojis. " +
-      "With the default model (Eleven v3) short audio tags such as [excited] or [whispers] steer the delivery. " +
+      "Costs credits, so a person must approve it first (the script is shown to them); do not retry if it is declined. Returns a mediaId to pass to generate_talking_video. Write only what is spoken: no stage directions, no emojis. " +
+      "With the default model (Eleven v4) short audio tags such as [excited] or [whispers] steer the delivery. " +
       "Keep ads short: 15-30 seconds is about 40-90 Hebrew words.",
     inputSchema: z.object({
-      script: z.string().min(1).max(3000).describe("The exact words to speak, in the language of the ad."),
+      script: z.string().min(1).max(2000).describe("The exact words to speak, in the language of the ad."),
       voiceId: z.string().min(1).describe("A voice id from list_voices."),
       title: z.string().min(1).max(120).describe("Short name for the file, written in Hebrew."),
       languageCode: z.string().length(2).optional().describe("ISO 639-1 code to force, e.g. 'he'. Omit to detect it from the text."),
     }),
     execute: async ({ script, voiceId, title, languageCode }) => {
       const model = ttsModel();
-      const { data, mimeType } = await generateAndWait("text-to-speech", {
-        model_id: model,
-        text: script,
-        voice: voiceId,
-        ...(languageCode && model !== "eleven_multilingual_v2" ? { language_code: languageCode } : {}),
-      });
+      const lang = languageCode && model !== "eleven_multilingual_v2" ? languageCode : undefined;
+      // Eleven v4 is served by the dialogue endpoint; the older models by the flows speech endpoint.
+      const { data, mimeType } =
+        model === "eleven_v4" || model === "eleven_v4_turbo"
+          ? await synthesizeDialogue({ text: script, voiceId, model, languageCode: lang })
+          : await generateAndWait("text-to-speech", {
+              model_id: model,
+              text: script,
+              voice: voiceId,
+              ...(lang ? { language_code: lang } : {}),
+            });
       const id = await saveMedia({
         kind: "audio",
         title,
@@ -142,7 +147,7 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
       audioMediaId: z.string().min(1).describe("mediaId of the speech from generate_speech."),
       imageMediaId: z.string().min(1).describe("mediaId of the presenter image."),
       title: z.string().min(1).max(120).describe("Name of the video, written in Hebrew."),
-      script: z.string().min(1).max(3000).describe("The spoken words, copied from the speech. Shown to the person who approves."),
+      script: z.string().min(1).max(2000).describe("The spoken words, copied from the speech. Shown to the person who approves."),
       resolution: z.enum(["480p", "720p"]).default("720p"),
     }),
     execute: async ({ audioMediaId, imageMediaId, title, script, resolution }) => {
@@ -202,12 +207,13 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
 
   return {
     list_voices: { tool: listVoices, requiresApproval: false, availableInScheduledRuns: true },
-    generate_speech: { tool: generateSpeech, requiresApproval: false, availableInScheduledRuns: true },
+    // Speech costs credits and the script is what the ad says, so it asks. A scheduled run can't ask
+    // (a parked approval can't be resumed yet), so it writes the script and may make the presenter
+    // image, then notifies; speech and video are made once a person continues in the conversation
+    // that run saved.
+    generate_speech: { tool: generateSpeech, requiresApproval: true, availableInScheduledRuns: false },
     generate_image: { tool: generateImage, requiresApproval: false, availableInScheduledRuns: true },
     list_media: { tool: listMediaTool, requiresApproval: false, availableInScheduledRuns: true },
-    // Video is the expensive step: it always asks. A scheduled run has nobody to ask (and a parked
-    // approval can't be resumed yet), so it prepares the script, speech and image, and the video is
-    // approved afterwards in the conversation that run saved.
     generate_talking_video: { tool: generateTalkingVideo, requiresApproval: true, availableInScheduledRuns: false },
     generate_scene_video: { tool: generateSceneVideo, requiresApproval: true, availableInScheduledRuns: false },
   };
