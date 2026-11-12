@@ -1,0 +1,1 @@
+ALTER TABLE `threads` ADD `allowed_tools` json;

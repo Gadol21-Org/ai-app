@@ -68,8 +68,27 @@ the variables below set the app starts normally and just has no extra tools. A s
 |---|---|
 | `WANDERLOG_COOKIE` | Enables the Wanderlog tools (trips, places, notes, hotels, checklists, expenses). The value of the `connect.sid` cookie of a logged-in session on wanderlog.com. |
 | `MCP_SERVERS` | Optional JSON for more servers, one line: `{"name":{"url":"https://host/mcp","headers":{"Authorization":"Bearer ..."}}}` for a remote server, or `{"name":{"command":"node","args":["server.js"],"env":{"KEY":"value"}}}` for a local process. |
-| `MCP_SERVERS` approval | Each server in `MCP_SERVERS` may add `"requireApproval"`: `"all"` (default: a person must allow every call), `"none"`, or a list of regexes matched against tool names. |
+| `MCP_SERVERS` approval | Every MCP tool asks for approval by default. Each server in `MCP_SERVERS` may add `"allowTools"`, a list of tool names that run without asking (`*` matches any characters, e.g. `["notes_get_*","notes_list_*","notes_search"]`), and/or `"requireApproval"`: `"all"` (default), `"none"`, or a list of regexes of the tools that ask. A name in `allowTools` always wins. See [MCP approvals](#mcp-approvals). |
 | `MCP_MAX_RESULT_CHARS` | Tool results longer than this (default `8000`) are truncated before they reach the chat, the database and the model. |
+
+### MCP approvals
+
+By default a person must allow every call of an MCP tool (an approval card shows in the chat). To skip the card for
+safe tools, list them per server in `allowTools`, so only the risky ones keep asking:
+
+```json
+{"notes":{"url":"https://notes.example.com/mcp","allowTools":["notes_get_*","notes_list_*","notes_search"]}}
+```
+
+- Each entry is a whole tool name, with `*` as a wildcard (case-insensitive). `"*"` alone would allow everything,
+  so prefer prefixes such as `get_*`, `list_*`, `search_*`. A tool that matches nothing keeps asking.
+- `allowTools` is applied on top of `requireApproval`: a tool in the list never asks, the rest follow `requireApproval`.
+- The built-in Wanderlog server already allows `wanderlog_get_*`, `wanderlog_list_*` and `wanderlog_search_*`
+  (read-only). Adding, editing, removing and moving still ask. To change that, define your own `wanderlog` entry in `MCP_SERVERS`.
+- The approval card of an asking tool also has **אל תשאל בשיחה זו** (allow in this conversation): that tool then runs
+  without asking for the rest of that conversation. It is saved with the conversation (so it survives a reload),
+  applies only to that tool, and does not affect other conversations.
+- Scheduled runs never get MCP tools, whatever the allow list says.
 
 ### Wanderlog
 
@@ -78,7 +97,7 @@ server (MIT, the most used and maintained of the ones on GitHub; **unofficial**,
 in `mcp-servers/package-lock.json`, installed in the Docker image without install scripts, and only talks to
 `wanderlog.com`. Things to know:
 
-- Reading and adding (trips, places, notes...) run without asking. Tools that remove, edit, update, rename or move
+- Reading (get, list and search tools) runs without asking. Tools that add, remove, edit, update, rename or move
   things show the usual approval card first. Scheduled runs don't get MCP tools.
 - It signs in with your **session cookie**, which gives the same access as your login (including editing and deleting
   trips). Keep it only in the `AI_APP_ENV` secret. Only that one variable is passed to the server process.

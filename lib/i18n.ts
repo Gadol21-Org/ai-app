@@ -142,6 +142,8 @@ export const t = {
     deniedResult: "המשתמש דחה את הפעלת הכלי",
     allow: "אישור",
     allowAlways: "אישור תמיד",
+    allowInConversation: "אל תשאל בשיחה זו",
+    allowInConversationFailed: "לא הצלחנו לשמור את ההרשאה לשיחה הזו",
     deny: "דחייה",
     denyAlways: "דחייה תמיד",
     cancelledBeforeDecision: "בוטל לפני קבלת החלטה",

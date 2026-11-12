@@ -136,12 +136,17 @@ export function getScheduledRunTools(): ToolSet {
   return pick((t) => t.availableInScheduledRuns);
 }
 
-/** The per-tool approval map for `toolApproval`. */
-export function getToolApproval(tools: ToolSet) {
+/**
+ * The per-tool approval map for `toolApproval`. `allowedInConversation` are MCP tools the person
+ * chose to allow for the rest of this conversation; built-in tools always keep their own rule.
+ */
+export function getToolApproval(tools: ToolSet, allowedInConversation: readonly string[] = []) {
   return Object.fromEntries(
-    Object.keys(tools).map((name) => [
-      name,
-      (registry[name] ? registry[name].requiresApproval : mcpToolRequiresApproval(name)) ? ("user-approval" as const) : ("not-applicable" as const),
-    ]),
+    Object.keys(tools).map((name) => {
+      const asks = registry[name]
+        ? registry[name].requiresApproval
+        : mcpToolRequiresApproval(name) && !allowedInConversation.includes(name);
+      return [name, asks ? ("user-approval" as const) : ("not-applicable" as const)];
+    }),
   );
 }

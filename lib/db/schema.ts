@@ -28,6 +28,8 @@ export const threads = mysqlTable(
     kind: mysqlEnum("kind", ["chat", "schedule"]).notNull().default("chat"),
     /** `provider:model` picked for this conversation; null means the default model. */
     model: varchar("model", { length: 128 }),
+    /** Tools the person allowed to run without asking for the rest of this conversation. */
+    allowedTools: json("allowed_tools").$type<string[]>(),
     createdAt: createdAt(),
     lastMessageAt: timestamp("last_message_at", { fsp: 3 }).notNull().defaultNow(),
   },

@@ -105,3 +105,22 @@ export async function deleteMessages(threadId: string, ids: string[]) {
     .delete(messages)
     .where(and(eq(messages.threadId, threadId), inArray(messages.id, ids)));
 }
+
+/** Names of the tools allowed to run without asking in this conversation. */
+export async function getAllowedTools(id: string): Promise<string[]> {
+  const [row] = await getDb()
+    .select({ allowedTools: threads.allowedTools })
+    .from(threads)
+    .where(eq(threads.id, id));
+  return Array.isArray(row?.allowedTools) ? row.allowedTools : [];
+}
+
+/** Allows a tool without asking for the rest of the conversation (idempotent). */
+export async function allowToolInThread(id: string, toolName: string) {
+  const current = await getAllowedTools(id);
+  if (current.includes(toolName)) return;
+  await getDb()
+    .update(threads)
+    .set({ allowedTools: [...current, toolName] })
+    .where(eq(threads.id, id));
+}

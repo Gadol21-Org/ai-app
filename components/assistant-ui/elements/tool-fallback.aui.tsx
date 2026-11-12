@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import {
   toolApprovalAcceptsText,
+  useAui,
   useAuiState,
   useScrollLock,
   useToolCallElapsed,
@@ -713,6 +714,8 @@ type ToolFallbackApprovalProps = React.ComponentPropsWithoutRef<"div"> &
   > & {
     interrupt?: ToolCallMessagePart["interrupt"];
     approval?: ToolCallMessagePart["approval"];
+    /** Name of the tool being asked about; with it the card offers "allow in this conversation". */
+    allowInConversationFor?: string;
   };
 
 const ToolFallbackApproval = forwardRef<
@@ -740,6 +743,7 @@ function ToolFallbackApprovalImpl({
   approval,
   respondToApproval,
   status,
+  allowInConversationFor,
   ...props
 }: Omit<ToolFallbackApprovalProps, "ref"> & {
   forwardedRef: React.ForwardedRef<HTMLDivElement>;
@@ -920,6 +924,24 @@ function ToolFallbackApprovalImpl({
   };
 
   const typedNote = () => (answer.trim() ? { text: answer } : {});
+
+  const aui = useAui();
+  // Saves "this tool no longer asks in this conversation" first, then allows the pending call.
+  const allowInConversation = () => {
+    if (locked || !allowInConversationFor || !respondToApproval) return;
+    submit(async () => {
+      const threadId = aui.threadListItem().getState().remoteId;
+      const res = threadId
+        ? await fetch(`/api/threads/${threadId}/allowed-tools`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ tool: allowInConversationFor }),
+          })
+        : undefined;
+      if (!res?.ok) throw new Error(t.tool.allowInConversationFailed);
+      await respondToApproval({ approved: true, ...typedNote() });
+    });
+  };
 
   // The kit does not validate an answer the request never constrained: a host
   // that cannot record an empty one rejects it, which reopens the controls.
@@ -1174,7 +1196,7 @@ function ToolFallbackApprovalImpl({
       ref={setPendingGroup}
     >
       {promptText}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           className={pressable}
@@ -1183,6 +1205,17 @@ function ToolFallbackApprovalImpl({
         >
           {t.tool.allow}
         </Button>
+        {allowInConversationFor && respondToApproval ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className={pressable}
+            onClick={allowInConversation}
+            disabled={locked}
+          >
+            {t.tool.allowInConversation}
+          </Button>
+        ) : null}
         <Button
           size="sm"
           variant="outline"
@@ -1274,6 +1307,7 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
             approval={approval}
             respondToApproval={respondToApproval}
             status={status}
+            allowInConversationFor={toolName}
             onFocusCapture={(event) => {
               const root = event.currentTarget.closest(
                 '[data-slot="tool-fallback-root"]',
