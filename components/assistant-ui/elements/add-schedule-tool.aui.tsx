@@ -5,6 +5,7 @@ import { CalendarClock, Trash2 } from "lucide-react";
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { ToolFallback } from "@/components/assistant-ui/elements/tool-fallback.aui";
 import { describeTiming } from "@/lib/schedules/timing";
+import { t } from "@/lib/i18n";
 
 type Args = { title?: string; prompt?: string; runAt?: string; cron?: string };
 
@@ -33,21 +34,21 @@ export const AddScheduleTool: ToolCallMessagePartComponent = (props) => {
     >
       <div className="flex items-center gap-2 font-medium">
         <CalendarClock className="text-muted-foreground size-4" />
-        Add a scheduled prompt
+        {t.schedule.addTitle}
       </div>
       <dl className="flex flex-col gap-2">
         <div>
-          <dt className="text-muted-foreground text-xs">Title</dt>
+          <dt className="text-muted-foreground text-xs">{t.schedule.title}</dt>
           <dd className="font-medium">{a.title ?? "…"}</dd>
         </div>
         {when && (
           <div>
-            <dt className="text-muted-foreground text-xs">Runs</dt>
+            <dt className="text-muted-foreground text-xs">{t.schedule.runs}</dt>
             <dd>{when}</dd>
           </div>
         )}
         <div>
-          <dt className="text-muted-foreground text-xs">Prompt</dt>
+          <dt className="text-muted-foreground text-xs">{t.schedule.prompt}</dt>
           <dd className="bg-muted/50 max-h-48 overflow-y-auto rounded-md p-2.5 whitespace-pre-wrap">
             {a.prompt ?? "…"}
           </dd>
@@ -66,7 +67,7 @@ export const AddScheduleTool: ToolCallMessagePartComponent = (props) => {
       {failed && <ToolFallback.Error status={status} />}
       {result !== undefined && !failed && (
         <p className="text-muted-foreground text-xs">
-          Saved. Manage it in Settings → Scheduled prompts.
+          {t.schedule.saved}
         </p>
       )}
     </div>
@@ -110,20 +111,20 @@ export const DeleteScheduleTool: ToolCallMessagePartComponent = (props) => {
     <div data-slot="delete-schedule-card" className="bg-card my-2 flex flex-col gap-3 rounded-xl border p-3 text-sm">
       <div className="flex items-center gap-2 font-medium">
         <Trash2 className="text-muted-foreground size-4" />
-        Delete a scheduled prompt
+        {t.schedule.deleteTitle}
       </div>
-      {schedule === undefined && !done && <p className="text-muted-foreground">Loading…</p>}
+      {schedule === undefined && !done && <p className="text-muted-foreground">{t.schedule.loading}</p>}
       {schedule === null && !done && (
-        <p className="text-muted-foreground">This schedule no longer exists.</p>
+        <p className="text-muted-foreground">{t.schedule.gone}</p>
       )}
       {schedule && (
         <dl className="flex flex-col gap-2">
           <div>
-            <dt className="text-muted-foreground text-xs">Title</dt>
+            <dt className="text-muted-foreground text-xs">{t.schedule.title}</dt>
             <dd className="font-medium">{schedule.title}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground text-xs">Runs</dt>
+            <dt className="text-muted-foreground text-xs">{t.schedule.runs}</dt>
             <dd>
               {describeTiming(
                 schedule.kind === "cron"
@@ -134,7 +135,7 @@ export const DeleteScheduleTool: ToolCallMessagePartComponent = (props) => {
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground text-xs">Prompt</dt>
+            <dt className="text-muted-foreground text-xs">{t.schedule.prompt}</dt>
             <dd className="bg-muted/50 max-h-48 overflow-y-auto rounded-md p-2.5 whitespace-pre-wrap">
               {schedule.prompt}
             </dd>
@@ -152,7 +153,7 @@ export const DeleteScheduleTool: ToolCallMessagePartComponent = (props) => {
         />
       )}
       {failed && <ToolFallback.Error status={status} />}
-      {done && !failed && <p className="text-muted-foreground text-xs">Deleted{deletedTitle ? ` "${deletedTitle}"` : ""}.</p>}
+      {done && !failed && <p className="text-muted-foreground text-xs">{t.schedule.deleted(deletedTitle)}</p>}
     </div>
   );
 };

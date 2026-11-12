@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Family AI: Next.js app (PWA + chat API) as a standalone Node server.
+# Kattan Bot: Next.js app (PWA + chat API) as a standalone Node server.
 # Built natively on the target architecture (an arm64 runner for an arm64 Oracle VM).
 
 FROM node:26-bookworm-slim AS deps

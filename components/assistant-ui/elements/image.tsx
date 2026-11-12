@@ -26,6 +26,7 @@ import type {
 } from "@assistant-ui/react";
 import { cn } from "@/lib/utils";
 import { hostOf, safeHref } from "../utils/href";
+import { t } from "@/lib/i18n";
 
 const extensionForMimeType = (mimeType?: string): string => {
   switch (mimeType) {
@@ -145,7 +146,7 @@ const copyImagePart = async (
     !navigator.clipboard ||
     typeof ClipboardItem === "undefined"
   ) {
-    throw new Error("Clipboard API is not available in this environment.");
+    throw new Error(t.image.noClipboard);
   }
   const blob = /^data:/i.test(part.image)
     ? dataUriToBlob(part.image)
@@ -214,7 +215,7 @@ function ImagePreview({
   fit = "contain",
   onLoad,
   onError,
-  alt = "Image content",
+  alt = t.image.content,
   src,
   ...props
 }: ImagePreviewProps) {
@@ -357,7 +358,7 @@ function ImageSource({
           className="hover:text-foreground truncate"
         >
           {displayLabel}
-          <span className="sr-only"> (opens in a new tab)</span>
+          <span className="sr-only">{t.image.opensNewTab}</span>
         </a>
       ) : (
         <span data-slot="image-source-label" className="truncate">
@@ -394,7 +395,7 @@ type ImageZoomProps = PropsWithChildren<{
   alt?: string;
 }>;
 
-function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
+function ImageZoom({ src, alt = t.image.preview, children }: ImageZoomProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -464,7 +465,7 @@ function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
         role="button"
         tabIndex={0}
         className="aui-image-zoom-trigger cursor-zoom-in"
-        aria-label="Click to zoom image"
+        aria-label={t.image.clickToZoom}
       >
         {children}
       </div>
@@ -477,7 +478,7 @@ function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
             aria-modal="true"
             className="aui-image-zoom-overlay fade-in animate-in fixed inset-0 z-50 flex items-center justify-center bg-black/80 duration-200"
             onClick={handleClose}
-            aria-label="Zoomed image"
+            aria-label={t.image.zoomed}
           >
             <img
               data-slot="image-zoom-content"
@@ -492,7 +493,7 @@ function ImageZoom({ src, alt = "Image preview", children }: ImageZoomProps) {
             <button
               ref={closeRef}
               type="button"
-              aria-label="Close zoomed image"
+              aria-label={t.image.closeZoomed}
               onClick={(e) => {
                 e.stopPropagation();
                 handleClose();
@@ -518,7 +519,7 @@ function ImageGenerating({ className }: { className?: string }) {
       )}
     >
       <Loader2Icon className="text-muted-foreground size-8 animate-spin" />
-      <span className="sr-only">Generating image…</span>
+      <span className="sr-only">{t.image.generating}</span>
     </div>
   );
 }
@@ -575,7 +576,7 @@ function RegenerateButton({
       }}
       disabled={isRegenerating}
       data-slot="image-regenerate"
-      aria-label="Regenerate image"
+      aria-label={t.image.regenerate}
       className="hover:bg-muted inline-flex size-7 items-center justify-center rounded disabled:opacity-50"
     >
       <RefreshCwIcon
@@ -595,7 +596,7 @@ function ImageActions({ part, onRegenerate, className }: ImageActionsProps) {
         type="button"
         onClick={() => downloadImagePart(part)}
         data-slot="image-download"
-        aria-label="Download image"
+        aria-label={t.image.download}
         className="hover:bg-muted inline-flex size-7 items-center justify-center rounded"
       >
         <DownloadIcon className="size-4" />
@@ -606,7 +607,7 @@ function ImageActions({ part, onRegenerate, className }: ImageActionsProps) {
           copyImagePart(part).catch(() => {});
         }}
         data-slot="image-copy"
-        aria-label="Copy image"
+        aria-label={t.image.copy}
         className="hover:bg-muted inline-flex size-7 items-center justify-center rounded"
       >
         <CopyIcon className="size-4" />
@@ -631,15 +632,15 @@ const ImageImpl: ImageMessagePartComponent = (props) => {
   if (status?.type === "incomplete" && status.reason === "content-filter") {
     return (
       <ImageRoot>
-        <ImageContentFilterError reason="The provider blocked this image." />
+        <ImageContentFilterError reason={t.image.blocked} />
       </ImageRoot>
     );
   }
 
   return (
     <ImageRoot>
-      <ImageZoom src={image} alt={filename || "Image content"}>
-        <ImagePreview src={image} alt={filename || "Image content"} />
+      <ImageZoom src={image} alt={filename || t.image.content}>
+        <ImagePreview src={image} alt={filename || t.image.content} />
       </ImageZoom>
       <ImageFilename>{filename}</ImageFilename>
     </ImageRoot>

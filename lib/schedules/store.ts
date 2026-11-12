@@ -2,6 +2,7 @@ import "server-only";
 import { and, asc, desc, eq, isNotNull, lte } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { nextCronRun, scheduleTimezone, validateCron } from "./timing";
+import { t } from "@/lib/i18n";
 
 const { schedules, scheduleRuns } = schema;
 
@@ -16,12 +17,12 @@ export async function createSchedule(input: NewSchedule) {
   const timezone = scheduleTimezone();
   const title = input.title.trim();
   const prompt = input.prompt.trim();
-  if (!title) throw new Error("A schedule needs a title.");
-  if (!prompt) throw new Error("A schedule needs a prompt.");
+  if (!title) throw new Error(t.schedule.errTitle);
+  if (!prompt) throw new Error(t.schedule.errPrompt);
 
   let nextRunAt: Date | null;
   if (input.kind === "once") {
-    if (input.runAt.getTime() <= Date.now()) throw new Error("The run time is in the past.");
+    if (input.runAt.getTime() <= Date.now()) throw new Error(t.schedule.errPast);
     nextRunAt = input.runAt;
   } else {
     validateCron(input.cron, timezone);
@@ -132,6 +133,6 @@ export async function finishRun(
 export async function failInterruptedRuns() {
   await getDb()
     .update(scheduleRuns)
-    .set({ status: "error", error: "Interrupted by a server restart.", finishedAt: new Date() })
+    .set({ status: "error", error: t.schedule.interrupted, finishedAt: new Date() })
     .where(eq(scheduleRuns.status, "running"));
 }

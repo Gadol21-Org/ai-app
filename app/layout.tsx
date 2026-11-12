@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Inter } from "next/font/google";
+import { Heebo, IBM_Plex_Mono, Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { RegisterServiceWorker } from "@/components/register-sw";
+import { t } from "@/lib/i18n";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -11,6 +12,11 @@ const inter = Inter({
   axes: ["opsz"],
 });
 
+const heebo = Heebo({
+  variable: "--font-heebo",
+  subsets: ["hebrew", "latin"],
+});
+
 const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
@@ -18,9 +24,9 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Family AI",
-  description: "Our family's AI assistant",
-  appleWebApp: { capable: true, title: "Family AI", statusBarStyle: "default" },
+  title: t.appName,
+  description: t.appDescription,
+  appleWebApp: { capable: true, title: t.appName, statusBarStyle: "default" },
   icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
 };
 
@@ -41,8 +47,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${ibmPlexMono.variable} antialiased`}>
+    <html lang="he" dir="rtl" suppressHydrationWarning>
+      <body className={`${inter.variable} ${heebo.variable} ${ibmPlexMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>

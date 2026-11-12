@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import { getChatModel, getChatModelId } from "@/lib/models";
 import { updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
+import { t } from "@/lib/i18n";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -11,12 +12,12 @@ export async function POST(req: Request, { params }: Ctx) {
   const { text }: { text: string } = await req.json();
 
   // If the model call fails, fall back to the opening words so the chat still gets a name.
-  let title = String(text).replace(/^user:\s*/, "").split("\n")[0].slice(0, 60) || "New chat";
+  let title = String(text).replace(/^user:\s*/, "").split("\n")[0].slice(0, 60) || t.prompts.fallbackTitle;
   try {
     const result = await generateText({
       model: getChatModel(),
       system:
-        "Write a title of at most 6 words for the conversation below, in the language it is written in. Reply with the title only: no quotes, no trailing punctuation.",
+        "Write a title of at most 6 words for the conversation below, in the language it is written in (Hebrew by default). Reply with the title only: no quotes, no trailing punctuation.",
       prompt: String(text).slice(0, 4000),
     });
     await recordUsage({

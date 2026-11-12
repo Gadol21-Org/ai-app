@@ -4,6 +4,7 @@ import { createPendingApproval } from "@/lib/approvals/pending";
 import { getChatModel, getChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { getScheduledRunTools, getToolApproval } from "@/lib/tools";
+import { t } from "@/lib/i18n";
 import { formatDateTime } from "@/lib/format";
 import { createThread, upsertMessage } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
@@ -36,7 +37,7 @@ export async function runSchedule(schedule: Schedule) {
   const runId = await (async () => {
     await createThread(threadId, {
       kind: "schedule",
-      title: `${schedule.title} (${formatDateTime(new Date(), schedule.timezone)})`,
+      title: t.schedule.runTitle(schedule.title, formatDateTime(new Date(), schedule.timezone)),
     });
     await upsertMessage(threadId, {
       id: userMessageId,
@@ -82,7 +83,7 @@ export async function runSchedule(schedule: Schedule) {
     }
     await reply(
       result.text ||
-        (requests.length > 0 ? "This run needs your approval before it can continue." : "(No reply.)"),
+        (requests.length > 0 ? t.schedule.runNeedsApproval : t.schedule.runNoReply),
     );
     await finishRun(runId, schedule.id, {
       status: requests.length > 0 ? "awaiting_approval" : "success",
@@ -91,7 +92,7 @@ export async function runSchedule(schedule: Schedule) {
   } catch (error) {
     console.error(`scheduled run "${schedule.title}" failed`, error);
     const message = error instanceof Error ? error.message : String(error);
-    await reply(`This scheduled run failed: ${message}`).catch(() => {});
+    await reply(t.schedule.runFailed(message)).catch(() => {});
     await finishRun(runId, schedule.id, {
       status: "error",
       error: error instanceof Error ? error.message : String(error),

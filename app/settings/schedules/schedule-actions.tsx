@@ -4,6 +4,7 @@ import { Pause, Play, PlayCircle, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { t } from "@/lib/i18n";
 
 export function ScheduleActions({
   id,
@@ -28,7 +29,7 @@ export function ScheduleActions({
         ...init,
         headers: init.body ? { "content-type": "application/json" } : undefined,
       });
-      if (!res.ok) setError("Something went wrong. Try again.");
+      if (!res.ok) setError(t.schedule.genericError);
       router.refresh();
     });
 
@@ -43,14 +44,14 @@ export function ScheduleActions({
             onClick={() => call("", { method: "PATCH", body: JSON.stringify({ enabled: !enabled }) })}
           >
             {enabled ? <Pause /> : <Play />}
-            {enabled ? "Disable" : "Enable"}
+            {enabled ? t.schedule.disable : t.schedule.enable}
           </Button>
         )}
         <Button
           variant="outline"
           size="icon-sm"
-          aria-label={`Run "${title}" now`}
-          title="Run now"
+          aria-label={t.schedule.runNowLabel(title)}
+          title={t.schedule.runNow}
           disabled={pending}
           onClick={() => call("/run", { method: "POST" })}
         >
@@ -59,11 +60,11 @@ export function ScheduleActions({
         <Button
           variant="outline"
           size="icon-sm"
-          aria-label={`Delete "${title}"`}
-          title="Delete"
+          aria-label={t.schedule.deleteLabel(title)}
+          title={t.schedule.delete}
           disabled={pending}
           onClick={() => {
-            if (confirm(`Delete the schedule "${title}"?`)) call("", { method: "DELETE" });
+            if (confirm(t.schedule.confirmDelete(title))) call("", { method: "DELETE" });
           }}
         >
           <Trash2 />

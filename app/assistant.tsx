@@ -18,6 +18,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { t } from "@/lib/i18n";
 
 const useThreadRuntime = () =>
   useChatRuntime({
@@ -41,7 +42,7 @@ export const Assistant = ({ timezone }: { timezone: string }) => {
             <SidebarInset>
               <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4 pt-[env(safe-area-inset-top)]">
                 <SidebarTrigger />
-                <h1 className="text-sm font-medium">Family AI</h1>
+                <h1 className="text-sm font-medium">{t.appName}</h1>
               </header>
               <div className="flex-1 overflow-hidden">
                 <Thread components={{ ToolFallback: ToolRenderer }} />

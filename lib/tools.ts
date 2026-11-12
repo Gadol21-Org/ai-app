@@ -2,6 +2,7 @@ import "server-only";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { createSchedule, deleteSchedule, getSchedule, listSchedules } from "@/lib/schedules/store";
+import { t } from "@/lib/i18n";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
 /**
@@ -24,7 +25,7 @@ const addSchedule = tool({
     "The prompt is run later with no conversation, so make it fully self-contained.",
   inputSchema: z
     .object({
-      title: z.string().min(1).max(120).describe("Short name for the schedule, shown in Settings."),
+      title: z.string().min(1).max(120).describe("Short name for the schedule, shown in Settings. Write it in Hebrew unless the user used another language."),
       prompt: z.string().min(1).max(4000).describe("The full instruction to run at each scheduled time."),
       runAt: z
         .string()
@@ -42,9 +43,9 @@ const addSchedule = tool({
     // Checked before the user is asked, so they are never shown a schedule that can't be saved.
     .superRefine((v, ctx) => {
       if ((v.runAt === undefined) === (v.cron === undefined)) {
-        ctx.addIssue({ code: "custom", message: "Provide exactly one of runAt (one-off) or cron (repeating)." });
+        ctx.addIssue({ code: "custom", message: t.schedule.errExactlyOne });
       } else if (v.runAt !== undefined && new Date(v.runAt).getTime() <= Date.now()) {
-        ctx.addIssue({ code: "custom", path: ["runAt"], message: "The run time is in the past." });
+        ctx.addIssue({ code: "custom", path: ["runAt"], message: t.schedule.errPast });
       } else if (v.cron !== undefined) {
         try {
           validateCron(v.cron, scheduleTimezone());
@@ -103,7 +104,7 @@ const deleteScheduleTool = tool({
   inputSchema: z.object({ id: z.string().min(1).describe("The schedule's id from list_schedules.") }),
   execute: async ({ id }) => {
     const schedule = await getSchedule(id);
-    if (!schedule) throw new Error("No schedule with that id.");
+    if (!schedule) throw new Error(t.schedule.errNotFound);
     await deleteSchedule(id);
     return { deleted: true, title: schedule.title };
   },
@@ -119,7 +120,7 @@ function pick(filter: (t: AgentTool) => boolean): ToolSet {
   return Object.fromEntries(
     Object.entries(registry)
       .filter(([, t]) => filter(t))
-      .map(([name, t]) => [name, t.tool]),
+      .map(([name, entry]) => [name, entry.tool]),
   );
 }
 
