@@ -85,7 +85,7 @@ safe tools, list them per server in `allowTools`, so only the risky ones keep as
 - `allowTools` is applied on top of `requireApproval`: a tool in the list never asks, the rest follow `requireApproval`.
 - The built-in Wanderlog server already allows `wanderlog_get_*`, `wanderlog_list_*` and `wanderlog_search_*`
   (read-only). Adding, editing, removing and moving still ask. To change that, define your own `wanderlog` entry in `MCP_SERVERS`.
-- The approval card of an asking tool also has **אישור בשיחה זו** (allow in this conversation): that tool then runs
+- The approval card of an asking tool also has **אל תשאל בשיחה זו** (allow in this conversation): that tool then runs
   without asking for the rest of that conversation. It is saved with the conversation (so it survives a reload),
   applies only to that tool, and does not affect other conversations.
 - Scheduled runs never get MCP tools, whatever the allow list says.
