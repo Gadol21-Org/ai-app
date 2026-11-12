@@ -261,6 +261,53 @@ export const t = {
     invalidMessage: "הודעה לא תקינה",
   },
 
+  /** Hebrew names for agent tools; a tool without an entry is shown by its code name. */
+  toolNames: {
+    list_schedules: "רשימת תזמונים",
+    wanderlog_list_trips: "רשימת הטיולים",
+    wanderlog_get_trip: "פרטי טיול",
+    wanderlog_get_trip_url: "קישור לטיול",
+    wanderlog_get_trip_forwarding_email: "כתובת מייל להעברת הזמנות לטיול",
+    wanderlog_search_places: "חיפוש מקומות",
+    wanderlog_search_guides: "חיפוש מדריכים",
+    wanderlog_get_guide: "קריאת מדריך",
+    wanderlog_search_hotels: "חיפוש מלונות",
+    wanderlog_create_trip: "יצירת טיול",
+    wanderlog_update_trip_dates: "עדכון תאריכי הטיול",
+    wanderlog_add_place: "הוספת מקום",
+    wanderlog_remove_place: "הסרת מקום",
+    wanderlog_annotate_place: "הערה על מקום",
+    wanderlog_move_place: "העברת מקום",
+    wanderlog_move_block: "העברת פריט",
+    wanderlog_add_note: "הוספת הערה",
+    wanderlog_edit_note: "עריכת הערה",
+    wanderlog_remove_note: "הסרת הערה",
+    wanderlog_add_hotel: "הוספת מלון",
+    wanderlog_add_transit: "הוספת הסעה",
+    wanderlog_add_car_rental: "הוספת השכרת רכב",
+    wanderlog_add_checklist: "הוספת רשימת משימות",
+    wanderlog_set_checklist_item: "סימון פריט ברשימה",
+    wanderlog_add_section: "הוספת קטע",
+    wanderlog_update_section: "עדכון קטע",
+    wanderlog_delete_section: "מחיקת קטע",
+    wanderlog_rename_day: "שינוי שם יום",
+    wanderlog_add_expense: "הוספת הוצאה",
+    wanderlog_edit_expense: "עריכת הוצאה",
+    wanderlog_remove_expense: "הסרת הוצאה",
+    wanderlog_list_expenses: "רשימת הוצאות",
+    wanderlog_add_journal: "הוספת רשומת יומן",
+    wanderlog_edit_journal: "עריכת רשומת יומן",
+    wanderlog_remove_journal: "הסרת רשומת יומן",
+    wanderlog_list_journal: "רשימת רשומות יומן",
+  } as Record<string, string>,
+
+  mcp: {
+    truncated: (omitted: number) =>
+      `[התוצאה קוצרה: ${formatNumber(omitted)} תווים נוספים הושמטו. אפשר לבקש תוצאה מצומצמת יותר, למשל יום אחד או פחות פריטים.]`,
+    emptyResult: "(תוצאה ריקה)",
+    contentOmitted: (kind: string) => `[תוכן מסוג ${kind} הושמט]`,
+  },
+
   prompts: {
     title:
       "כתבו כותרת של עד 6 מילים לשיחה שלהלן, בשפה שבה היא כתובה (עברית כברירת מחדל). החזירו את הכותרת בלבד: בלי מירכאות ובלי סימן פיסוק בסוף.",
@@ -270,3 +317,5 @@ export const t = {
 
 /** Numbers and dates are always shown the Israeli way. */
 export const formatNumber = (value: number) => new Intl.NumberFormat(LOCALE).format(value);
+
+export const toolDisplayName = (toolName: string) => t.toolNames[toolName] ?? toolName;

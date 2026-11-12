@@ -38,7 +38,7 @@ import {
 } from "./collapsible-root";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { t } from "@/lib/i18n";
+import { t, toolDisplayName } from "@/lib/i18n";
 
 const ANIMATION_DURATION = 200;
 
@@ -196,7 +196,7 @@ function ToolFallbackTrigger({
           isRunning && "shimmer motion-reduce:animate-none",
         )}
       >
-        {label}: <b>{toolName}</b>
+        {label}: <b>{toolDisplayName(toolName)}</b>
       </span>
       <ToolFallbackDuration />
       <ChevronDownIcon
@@ -262,7 +262,7 @@ function ToolFallbackArgs({
       className={cn("aui-tool-fallback-args", className)}
       {...props}
     >
-      <pre className="aui-tool-fallback-args-value bg-muted/50 text-foreground/90 rounded-md p-2.5 text-xs break-words whitespace-pre-wrap">
+      <pre className="aui-tool-fallback-args-value bg-muted/50 text-foreground/90 max-h-48 overflow-auto rounded-md p-2.5 text-xs break-words whitespace-pre-wrap">
         {argsText}
       </pre>
     </div>
@@ -304,7 +304,7 @@ function ToolFallbackResult({
       <p className="aui-tool-fallback-result-header text-muted-foreground text-xs font-medium">
         {t.tool.result}
       </p>
-      <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 rounded-md p-2.5 text-xs break-words whitespace-pre-wrap">
+      <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 max-h-72 overflow-auto rounded-md p-2.5 text-xs break-words whitespace-pre-wrap">
         {formatUnknownValue(result, 2)}
       </pre>
     </div>

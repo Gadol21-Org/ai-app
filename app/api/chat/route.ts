@@ -1,4 +1,4 @@
-import { convertToModelMessages, isStepCount, streamText, type UIMessage } from "ai";
+import { convertToModelMessages, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
 import { getChatModel, getChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
@@ -32,16 +32,21 @@ export async function POST(req: Request) {
   const { messages, id: threadId }: { messages: UIMessage[]; id?: string } =
     await req.json();
 
-  const tools = getChatTools();
+  const tools = await getChatTools();
 
   const result = streamText({
     abortSignal: req.signal,
     model: getChatModel(),
     system: `${SYSTEM_PROMPT}\n\nCurrent time: ${describeNow(scheduleTimezone())}. When a tool call is not approved, do not retry it.`,
-    messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
+    // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
+    messages: pruneMessages({
+      messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
+      toolCalls: "before-last-4-messages",
+    }),
     tools,
     toolApproval: getToolApproval(tools),
-    stopWhen: isStepCount(5),
+    // Building a trip means many tool calls in a row.
+    stopWhen: isStepCount(10),
     onFinish: ({ totalUsage }) =>
       recordUsage({
         threadId: threadId ?? null,

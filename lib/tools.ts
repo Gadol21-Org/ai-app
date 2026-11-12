@@ -3,6 +3,7 @@ import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { createSchedule, deleteSchedule, getSchedule, listSchedules } from "@/lib/schedules/store";
 import { t } from "@/lib/i18n";
+import { getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
 /**
@@ -125,8 +126,9 @@ function pick(filter: (t: AgentTool) => boolean): ToolSet {
 }
 
 /** Tools for an interactive chat. */
-export function getChatTools(): ToolSet {
-  return pick(() => true);
+export async function getChatTools(): Promise<ToolSet> {
+  // Built-in tools win over an MCP tool with the same name.
+  return { ...(await getMcpTools()), ...pick(() => true) };
 }
 
 /** Tools for a scheduled run: no self-scheduling, so a schedule can never spawn more schedules. */
@@ -139,7 +141,7 @@ export function getToolApproval(tools: ToolSet) {
   return Object.fromEntries(
     Object.keys(tools).map((name) => [
       name,
-      registry[name]?.requiresApproval ? ("user-approval" as const) : ("not-applicable" as const),
+      (registry[name] ? registry[name].requiresApproval : mcpToolRequiresApproval(name)) ? ("user-approval" as const) : ("not-applicable" as const),
     ]),
   );
 }
