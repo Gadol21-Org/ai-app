@@ -3,6 +3,7 @@ import { StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { ToolSet } from "ai";
+import { t } from "@/lib/i18n";
 
 /**
  * MCP servers the chat agent can call as tools.
@@ -20,9 +21,15 @@ import type { ToolSet } from "ai";
  * never takes the chat down.
  */
 
-export type McpServerConfig =
+/**
+ * `requireApproval` says which of the server's tools a person must allow before they run:
+ * "all" (the default, so a new server is safe), "none", or a list of regular expressions
+ * matched against the tool name.
+ */
+export type McpServerConfig = (
   | { url: string; headers?: Record<string, string> }
-  | { command: string; args?: string[]; env?: Record<string, string> };
+  | { command: string; args?: string[]; env?: Record<string, string> }
+) & { requireApproval?: "all" | "none" | string[] };
 
 /** Tool results longer than this are cut before they reach the chat, the DB or the model. */
 export const MAX_TOOL_RESULT_CHARS =
@@ -91,7 +98,7 @@ type McpResult = {
 export function truncate(text: string, max = MAX_TOOL_RESULT_CHARS): string {
   if (text.length <= max) return text;
   const omitted = text.length - max;
-  return `${text.slice(0, max)}\n\n[truncated: ${omitted.toLocaleString("en-US")} more characters omitted. Ask for a narrower result (a single day, fewer items) if you need the rest.]`;
+  return `${text.slice(0, max)}\n\n${t.mcp.truncated(omitted)}`;
 }
 
 /** Flattens an MCP tool result to plain text, so it reads well in the chat and costs few tokens. */
@@ -103,14 +110,14 @@ export function resultToText(result: unknown): string {
   const parts = content.map((item) =>
     item.type === "text" && typeof item.text === "string"
       ? item.text
-      : `[${item.mimeType ?? item.type} content omitted]`,
+      : t.mcp.contentOmitted(item.mimeType ?? item.type),
   );
   const text = parts.join("\n").trim();
   return (
     text ||
     (structuredContent !== undefined
       ? JSON.stringify(structuredContent)
-      : "(empty result)")
+      : t.mcp.emptyResult)
   );
 }
 
@@ -155,6 +162,22 @@ async function connect(
 
 type Loaded = { client: MCPClient; tools: ToolSet };
 
+// Names of loaded MCP tools that need a person's approval (filled in as servers load).
+const approvalRequired = new Set<string>();
+
+export function mcpToolRequiresApproval(toolName: string): boolean {
+  return approvalRequired.has(toolName);
+}
+
+function needsApproval(
+  toolName: string,
+  rule: McpServerConfig["requireApproval"] = "all",
+): boolean {
+  if (rule === "all") return true;
+  if (rule === "none") return false;
+  return rule.some((pattern) => new RegExp(pattern, "i").test(toolName));
+}
+
 // One long-lived connection per server, shared by all requests of this Node process
 // (a stdio server is a child process, too slow to start for every message).
 const loaded = new Map<string, Promise<Loaded>>();
@@ -165,7 +188,12 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
     pending = (async () => {
       const client = await connect(name, config);
       try {
-        return { client, tools: limitResults(await client.tools()) as ToolSet };
+        const tools = limitResults(await client.tools()) as ToolSet;
+        for (const toolName of Object.keys(tools)) {
+          if (needsApproval(toolName, config.requireApproval))
+            approvalRequired.add(toolName);
+        }
+        return { client, tools };
       } catch (error) {
         await client.close().catch(() => {});
         throw error;

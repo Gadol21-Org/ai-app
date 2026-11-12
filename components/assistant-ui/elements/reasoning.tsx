@@ -18,6 +18,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "./collapsible-root";
+import { t } from "@/lib/i18n";
 
 export const ANIMATION_DURATION = 200;
 
@@ -200,14 +201,14 @@ function ReasoningTrigger({
           active && "shimmer motion-reduce:animate-none",
         )}
       >
-        Reasoning{durationText}
+        {t.chat.reasoning}{durationText}
       </span>
       <ChevronDownIcon
         data-slot="reasoning-trigger-chevron"
         className={cn(
           "aui-reasoning-trigger-chevron mt-0.5 size-4 shrink-0",
           "transition-transform duration-(--animation-duration) ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-          "-rotate-90",
+          "-rotate-90 rtl:rotate-90",
           "group-data-open/trigger:rotate-0",
           "group-data-panel-open/trigger:rotate-0",
         )}

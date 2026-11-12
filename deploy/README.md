@@ -36,9 +36,25 @@ This is the same VM, deploy key and `cloudflared` tunnel as budget-tracking, so 
 
 ```
 GOOGLE_GENERATIVE_AI_API_KEY=...
+MYSQL_URL=mysql://ai_app:<password>@<db-private-ip>:3306/ai_app
 # CHAT_MODEL=google:gemini-3.8-flash
 WANDERLOG_COOKIE=s%3A...
 ```
+
+### Database
+
+The app shares budget-tracking's MySQL HeatWave instance (the free tier allows only one), with its own
+database and a user that can reach nothing else. From the VM, open a shell as the admin user
+(`docker run --rm -it mysql:8 mysql -h <db-private-ip> -u <admin> -p`) and run:
+
+```sql
+CREATE DATABASE ai_app CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
+CREATE USER 'ai_app'@'%' IDENTIFIED BY '<password>';
+GRANT ALL PRIVILEGES ON ai_app.* TO 'ai_app'@'%';
+```
+
+Use letters and digits in the password, or percent-encode it in `MYSQL_URL`. The app creates and
+migrates its tables on startup; a failed migration stops the container and fails the deploy.
 
 To change a setting, update the secret and re-run the workflow (the file is written on each deploy).
 

@@ -17,6 +17,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import { TooltipIconButton } from "@/components/assistant-ui/elements/tooltip-icon-button";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 
 type MarkdownTextProps = Partial<TextMessagePartProps> & {
   components?: Parameters<typeof memoizeMarkdownComponents>[0];
@@ -78,7 +79,7 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
       <span className="aui-code-header-language text-muted-foreground font-medium lowercase">
         {language}
       </span>
-      <TooltipIconButton tooltip="Copy" onClick={onCopy}>
+      <TooltipIconButton tooltip={t.chat.copyCode} onClick={onCopy}>
         {!isCopied && (
           <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
         )}

@@ -2,6 +2,7 @@
 
 import { useAui, useAuiState } from "@assistant-ui/react";
 import { useAttachmentSrc } from "@/hooks/use-attachment-src";
+import { t } from "@/lib/i18n";
 
 export function useAttachmentState() {
   const aui = useAui();
@@ -14,11 +15,11 @@ export function useAttachmentState() {
     const type = s.attachment.type;
     switch (type) {
       case "image":
-        return "Image";
+        return t.attachment.image;
       case "document":
-        return "Document";
+        return t.attachment.document;
       case "file":
-        return "File";
+        return t.attachment.file;
       default:
         return type;
     }

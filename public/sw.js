@@ -1,7 +1,7 @@
 // Minimal service worker: makes the app installable and lets the shell open
 // offline. Network first for pages, cache first for immutable build assets.
 // API calls (/api/*) are never cached.
-const CACHE = "family-ai-v2";
+const CACHE = "kattan-bot-v1";
 const SHELL = ["/", "/icons/icon-192.png"];
 
 self.addEventListener("install", (e) => {

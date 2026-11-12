@@ -4,11 +4,12 @@ import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 
 const options = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "system", label: "System", Icon: Monitor },
-  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "light", label: t.theme.light, Icon: Sun },
+  { value: "system", label: t.theme.system, Icon: Monitor },
+  { value: "dark", label: t.theme.dark, Icon: Moon },
 ] as const;
 
 export function ThemeToggle() {
@@ -19,7 +20,7 @@ export function ThemeToggle() {
   return (
     <div
       role="radiogroup"
-      aria-label="Theme"
+      aria-label={t.theme.label}
       className="bg-sidebar-accent grid grid-cols-3 gap-1 rounded-lg p-1"
     >
       {options.map(({ value, label, Icon }) => {

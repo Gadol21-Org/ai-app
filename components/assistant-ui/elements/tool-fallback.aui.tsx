@@ -38,6 +38,7 @@ import {
 } from "./collapsible-root";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { t } from "@/lib/i18n";
 
 const ANIMATION_DURATION = 200;
 
@@ -161,14 +162,14 @@ function ToolFallbackTrigger({
   const Icon = statusIconMap[statusType];
   const label =
     responseDeliveryStatus === "queued"
-      ? "Reply queued, not sent yet"
+      ? t.tool.queued
       : statusType === "running"
-        ? "Running tool"
+        ? t.tool.running
         : statusType === "requires-action"
-          ? "Waiting on tool"
+          ? t.tool.waiting
           : statusType === "incomplete"
-            ? `${isCancelled ? "Cancelled" : "Failed"} tool`
-            : "Used tool";
+            ? (isCancelled ? t.tool.cancelled : t.tool.failed)
+            : t.tool.used;
 
   return (
     <CollapsibleTrigger
@@ -203,7 +204,7 @@ function ToolFallbackTrigger({
         className={cn(
           "aui-tool-fallback-trigger-chevron size-4 shrink-0",
           "transition-transform duration-(--animation-duration) ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-          "-rotate-90",
+          "-rotate-90 rtl:rotate-90",
           "group-data-open/trigger:rotate-0",
           "group-data-panel-open/trigger:rotate-0",
         )}
@@ -301,7 +302,7 @@ function ToolFallbackResult({
       {...props}
     >
       <p className="aui-tool-fallback-result-header text-muted-foreground text-xs font-medium">
-        Result:
+        {t.tool.result}
       </p>
       <pre className="aui-tool-fallback-result-content bg-muted/50 text-foreground/90 mt-1 max-h-72 overflow-auto rounded-md p-2.5 text-xs break-words whitespace-pre-wrap">
         {formatUnknownValue(result, 2)}
@@ -326,7 +327,7 @@ function ToolFallbackError({
   if (!errorText) return null;
 
   const isCancelled = status.reason === "cancelled";
-  const headerText = isCancelled ? "Cancelled reason:" : "Error:";
+  const headerText = isCancelled ? t.tool.cancelledReason : t.tool.error;
 
   return (
     <div
@@ -344,14 +345,14 @@ function ToolFallbackError({
   );
 }
 
-const APPROVED_RESULT = "Approved by user";
-const DENIED_RESULT = "User denied tool execution";
+const APPROVED_RESULT = t.tool.approvedResult;
+const DENIED_RESULT = t.tool.deniedResult;
 
 const APPROVAL_OPTION_DEFAULT_LABELS: Record<string, string> = {
-  "allow-once": "Allow",
-  "allow-always": "Always allow",
-  "reject-once": "Deny",
-  "reject-always": "Always deny",
+  "allow-once": t.tool.allow,
+  "allow-always": t.tool.allowAlways,
+  "reject-once": t.tool.deny,
+  "reject-always": t.tool.denyAlways,
 };
 
 const isKnownKind = (kind: string) =>
@@ -412,8 +413,8 @@ const approvalReceipt = (
       outcome: "closed",
       label:
         approval.resolution === "cancelled"
-          ? "Cancelled before a decision"
-          : "Expired before a decision",
+          ? t.tool.cancelledBeforeDecision
+          : t.tool.expiredBeforeDecision,
     };
 
   const chosen =
@@ -428,17 +429,17 @@ const approvalReceipt = (
         : approval.optionId;
   const answered =
     isQuestion(approval) || (chosen !== undefined && !isKnownKind(chosen.kind));
-  const automatic = approval.isAutomatic ? " automatically" : "";
+  const automatic = approval.isAutomatic ? t.tool.automatically : "";
 
   if (approval.approved)
     return {
       outcome: "allowed",
-      label: `${answered ? "Answered" : "Allowed"}${automatic}`,
+      label: `${answered ? t.tool.answered : t.tool.allowed}${automatic}`,
       option,
     };
   return {
     outcome: "refused",
-    label: `${answered ? "Dismissed" : "Denied"}${automatic}`,
+    label: `${answered ? t.tool.dismissed : t.tool.denied}${automatic}`,
     option,
   };
 };
@@ -660,8 +661,8 @@ function ToolFallbackApprovalQuestions({
                 aria-label={question.prompt}
                 placeholder={
                   question.options?.length
-                    ? "Or type an answer"
-                    : "Type your answer"
+                    ? t.tool.orTypeAnswer
+                    : t.tool.typeAnswer
                 }
               />
             ) : null}
@@ -675,7 +676,7 @@ function ToolFallbackApprovalQuestions({
           onClick={send}
           disabled={locked || !complete}
         >
-          Send
+          {t.tool.send}
         </Button>
         {dismissible ? (
           <Button
@@ -685,7 +686,7 @@ function ToolFallbackApprovalQuestions({
             onClick={onDismiss}
             disabled={locked}
           >
-            Dismiss
+            {t.tool.dismiss}
           </Button>
         ) : null}
       </div>
@@ -959,7 +960,7 @@ function ToolFallbackApprovalImpl({
       onClick={dismiss}
       disabled={locked}
     >
-      Dismiss
+      {t.tool.dismiss}
     </Button>
   ) : null;
 
@@ -978,9 +979,9 @@ function ToolFallbackApprovalImpl({
         value={answer}
         onChange={(event) => setAnswer(event.target.value)}
         disabled={locked}
-        aria-label={question ? (approval?.prompt ?? "Answer") : "Note"}
+        aria-label={question ? (approval?.prompt ?? t.tool.answerLabel) : t.tool.noteLabel}
         placeholder={
-          question ? "Type your answer" : "Add a note to your decision"
+          question ? t.tool.typeAnswer : t.tool.addNote
         }
       />
       {question && (
@@ -991,7 +992,7 @@ function ToolFallbackApprovalImpl({
             onClick={submitAnswer}
             disabled={locked}
           >
-            Send
+            {t.tool.send}
           </Button>
           {dismissButton}
         </div>
@@ -1066,7 +1067,7 @@ function ToolFallbackApprovalImpl({
             onClick={() => respondWithOption(confirming)}
             disabled={locked}
           >
-            Confirm
+            {t.tool.confirm}
           </Button>
           <Button
             size="sm"
@@ -1078,7 +1079,7 @@ function ToolFallbackApprovalImpl({
             }}
             disabled={locked}
           >
-            Back
+            {t.tool.back}
           </Button>
         </div>
       </div>
@@ -1126,7 +1127,7 @@ function ToolFallbackApprovalImpl({
               onClick={() => respond(false)}
               disabled={locked}
             >
-              Deny
+              {t.tool.deny}
             </Button>
           )}
           {!acceptsText && dismissButton}
@@ -1180,7 +1181,7 @@ function ToolFallbackApprovalImpl({
           onClick={() => respond(true)}
           disabled={locked}
         >
-          Allow
+          {t.tool.allow}
         </Button>
         <Button
           size="sm"
@@ -1189,7 +1190,7 @@ function ToolFallbackApprovalImpl({
           onClick={() => respond(false)}
           disabled={locked}
         >
-          Deny
+          {t.tool.deny}
         </Button>
       </div>
       {answerField}

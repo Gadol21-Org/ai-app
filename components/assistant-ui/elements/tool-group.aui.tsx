@@ -17,6 +17,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "./collapsible-root";
+import { t } from "@/lib/i18n";
 
 const ANIMATION_DURATION = 200;
 
@@ -101,7 +102,7 @@ function ToolGroupTrigger({
   count: number;
   active?: boolean;
 }) {
-  const label = `${count} tool ${count === 1 ? "call" : "calls"}`;
+  const label = t.chat.toolCalls(count);
 
   return (
     <CollapsibleTrigger
@@ -138,7 +139,7 @@ function ToolGroupTrigger({
         className={cn(
           "aui-tool-group-trigger-chevron size-3 shrink-0",
           "transition-transform duration-(--animation-duration) ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
-          "-rotate-90",
+          "-rotate-90 rtl:rotate-90",
           "group-data-open/trigger:rotate-0",
           "group-data-panel-open/trigger:rotate-0",
         )}

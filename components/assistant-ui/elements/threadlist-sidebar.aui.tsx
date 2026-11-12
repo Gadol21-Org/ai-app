@@ -1,5 +1,6 @@
 import type * as React from "react";
-import { MessagesSquare } from "lucide-react";
+import { MessagesSquare, Settings } from "lucide-react";
+import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Sidebar,
@@ -12,12 +13,13 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { ThreadList } from "@/components/assistant-ui/elements/thread-list.aui";
+import { t } from "@/lib/i18n";
 
 export function ThreadListSidebar({
   ...props
 }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar {...props}>
+    <Sidebar side="right" {...props}>
       <SidebarHeader className="aui-sidebar-header mb-2 border-b">
         <div className="aui-sidebar-header-content flex items-center justify-between">
           <SidebarMenu>
@@ -35,7 +37,7 @@ export function ThreadListSidebar({
                 </div>
                 <div className="aui-sidebar-header-heading me-6 flex flex-col gap-0.5 leading-none">
                   <span className="aui-sidebar-header-title font-semibold">
-                    Family AI
+                    {t.appName}
                   </span>
                 </div>
               </SidebarMenuButton>
@@ -48,6 +50,14 @@ export function ThreadListSidebar({
       </SidebarContent>
       {props.collapsible !== "none" && <SidebarRail />}
       <SidebarFooter className="aui-sidebar-footer border-t">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<Link href="/settings" />}>
+              <Settings />
+              <span>{t.sidebar.settings}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <ThemeToggle />
       </SidebarFooter>
     </Sidebar>

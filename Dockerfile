@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Family AI: Next.js app (PWA + chat API) as a standalone Node server.
+# Kattan Bot: Next.js app (PWA + chat API) as a standalone Node server.
 # Built natively on the target architecture (an arm64 runner for an arm64 Oracle VM).
 
 FROM node:26-bookworm-slim AS deps
@@ -30,6 +30,8 @@ COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=mcp --chown=node:node /mcp-servers ./mcp-servers
+# SQL migrations, applied on startup (instrumentation.ts).
+COPY --from=build --chown=node:node /app/drizzle ./drizzle
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
