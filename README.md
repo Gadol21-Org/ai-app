@@ -1,4 +1,4 @@
-# Family AI
+# Kattan Bot
 
 An installable chat app (PWA) for the family. Next.js + TypeScript, chat UI from
 [assistant-ui](https://www.assistant-ui.com) (shadcn/ui components), model calls through the

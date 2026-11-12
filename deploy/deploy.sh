@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs on the VM: replaces the running Family AI container with the given image.
+# Runs on the VM: replaces the running Kattan Bot container with the given image.
 #   ai-app  published on 127.0.0.1:8085 of the VM only
 # The cloudflared service on the VM forwards a public hostname to that port.
 # Usage: deploy.sh <image>
