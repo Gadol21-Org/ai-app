@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Heebo, IBM_Plex_Mono, Inter } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { ViewportSync } from "@/components/viewport-sync";
 import { RegisterServiceWorker } from "@/components/register-sw";
 import { t } from "@/lib/i18n";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -41,6 +42,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Android Chrome: resize the layout viewport (not just the visual one) when the keyboard opens.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({
@@ -52,6 +55,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>
+        <ViewportSync />
         <RegisterServiceWorker />
       </body>
     </html>
