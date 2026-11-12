@@ -83,7 +83,7 @@ export default async function SchedulesPage() {
   for (const r of runs) if (!lastRunBySchedule.has(r.scheduleId) && r.status !== "running") lastRunBySchedule.set(r.scheduleId, r);
 
   return (
-    <div className="h-app overflow-y-auto">
+    <div className="app-shell overflow-y-auto">
       <header className="bg-background/80 sticky top-0 z-10 flex h-14 items-center gap-2 border-b px-4 pt-[env(safe-area-inset-top)] backdrop-blur">
         <Button variant="ghost" size="icon" aria-label={t.schedule.backToSettings} nativeButton={false} render={<Link href="/settings" />}>
           <ArrowRight />

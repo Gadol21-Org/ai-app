@@ -61,7 +61,7 @@ export default async function SettingsPage() {
   ]);
 
   return (
-    <div className="h-app overflow-y-auto">
+    <div className="app-shell overflow-y-auto">
       <header className="bg-background/80 sticky top-0 z-10 flex h-14 items-center gap-2 border-b px-4 pt-[env(safe-area-inset-top)] backdrop-blur">
         <Button
           variant="ghost"
