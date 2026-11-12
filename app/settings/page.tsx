@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarClock, ChevronRight } from "lucide-react";
+import { ArrowRight, CalendarClock, ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -18,13 +18,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { t, formatNumber } from "@/lib/i18n";
 import { formatBytes, formatCount, formatDay, formatUsd } from "@/lib/format";
 import { getChatModelId } from "@/lib/models";
 import { retentionDays } from "@/lib/retention";
 import { getConversationSizes, getDatabaseSize } from "@/lib/storage";
 import { getSpendSummary, type SpendTotals } from "@/lib/usage";
 
-export const metadata: Metadata = { title: "Settings · Family AI" };
+export const metadata: Metadata = { title: `${t.settings.pageTitle} · ${t.appName}` };
 // Always read fresh numbers from the database.
 export const dynamic = "force-dynamic";
 
@@ -36,8 +37,8 @@ function SpendCard({ label, hint, totals }: { label: string; hint: string; total
         <CardTitle className="text-3xl tabular-nums">{formatUsd(totals.costUsd)}</CardTitle>
       </CardHeader>
       <CardContent className="text-muted-foreground text-sm">
-        {formatCount(totals.inputTokens)} tokens in · {formatCount(totals.outputTokens)} out ·{" "}
-        {formatCount(totals.calls)} model calls
+        {formatCount(totals.inputTokens)} {t.settings.tokensIn} · {formatCount(totals.outputTokens)} {t.settings.tokensOut} ·{" "}
+        {formatCount(totals.calls)} {t.settings.modelCalls}
         <div className="mt-1 text-xs">{hint}</div>
       </CardContent>
     </Card>
@@ -57,13 +58,13 @@ export default async function SettingsPage() {
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Back to chat"
+          aria-label={t.settings.backToChat}
           nativeButton={false}
           render={<Link href="/" />}
         >
-          <ArrowLeft />
+          <ArrowRight />
         </Button>
-        <h1 className="text-sm font-medium">Settings</h1>
+        <h1 className="text-sm font-medium">{t.settings.pageTitle}</h1>
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -73,44 +74,43 @@ export default async function SettingsPage() {
         >
           <CalendarClock className="text-muted-foreground size-5 shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="font-medium">Scheduled prompts</div>
+            <div className="font-medium">{t.schedule.pageTitle}</div>
             <div className="text-muted-foreground text-sm">
-              Prompts the assistant runs on its own, once or on a repeat.
+              {t.settings.scheduledLinkDesc}
             </div>
           </div>
-          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+          <ChevronLeft className="text-muted-foreground size-4 shrink-0" />
         </Link>
 
         <section className="flex flex-col gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Spend</h2>
+            <h2 className="text-lg font-semibold">{t.settings.spend}</h2>
             <p className="text-muted-foreground text-sm">
-              Estimated from token counts and the model&apos;s list price. Your Google bill is the
-              source of truth.
+              {t.settings.spendDesc}
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <SpendCard label="Last 30 days" hint="Rolling window ending now" totals={last30Days} />
-            <SpendCard label="All time" hint="Since the first recorded message" totals={allTime} />
+            <SpendCard label={t.settings.last30} hint={t.settings.last30Hint} totals={last30Days} />
+            <SpendCard label={t.settings.allTime} hint={t.settings.allTimeHint} totals={allTime} />
           </div>
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">By conversation</h2>
+          <h2 className="text-lg font-semibold">{t.settings.byConversation}</h2>
           {byConversation.length === 0 ? (
             <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-              No spend yet. Costs appear here after the first reply.
+              {t.settings.noSpend}
             </p>
           ) : (
             <div className="rounded-lg border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Conversation</TableHead>
-                    <TableHead className="hidden sm:table-cell">Last used</TableHead>
-                    <TableHead className="hidden text-right sm:table-cell">Tokens</TableHead>
-                    <TableHead className="hidden text-right sm:table-cell">Stored</TableHead>
-                    <TableHead className="text-right">Cost</TableHead>
+                    <TableHead>{t.settings.colConversation}</TableHead>
+                    <TableHead className="hidden sm:table-cell">{t.settings.colLastUsed}</TableHead>
+                    <TableHead className="hidden text-end sm:table-cell">{t.settings.colTokens}</TableHead>
+                    <TableHead className="hidden text-end sm:table-cell">{t.settings.colStored}</TableHead>
+                    <TableHead className="text-end">{t.settings.colCost}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -118,29 +118,29 @@ export default async function SettingsPage() {
                     <TableRow key={c.threadId ?? "none"}>
                       <TableCell className="max-w-0 w-full">
                         <div className="flex items-center gap-2">
-                          <span className="truncate">{c.title ?? "Untitled conversation"}</span>
-                          {c.status === "deleted" && <Badge variant="outline">Deleted</Badge>}
-                          {c.status === "archived" && <Badge variant="outline">Archived</Badge>}
+                          <span className="truncate">{c.title ?? t.settings.untitled}</span>
+                          {c.status === "deleted" && <Badge variant="outline">{t.settings.badgeDeleted}</Badge>}
+                          {c.status === "archived" && <Badge variant="outline">{t.settings.badgeArchived}</Badge>}
                         </div>
                         <div className="text-muted-foreground text-xs sm:hidden">
-                          {formatDay(c.lastUsedAt)} · {formatCount(c.inputTokens + c.outputTokens)} tokens ·{" "}
+                          {formatDay(c.lastUsedAt)} · {formatCount(c.inputTokens + c.outputTokens)} {t.settings.tokensWord} ·{" "}
                           {c.threadId && sizes.has(c.threadId)
                             ? formatBytes(sizes.get(c.threadId)!.bytes)
-                            : "no stored messages"}
+                            : t.settings.noStored}
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground hidden whitespace-nowrap sm:table-cell">
                         {formatDay(c.lastUsedAt)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
+                      <TableCell className="text-muted-foreground hidden text-end tabular-nums sm:table-cell">
                         {formatCount(c.inputTokens + c.outputTokens)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
+                      <TableCell className="text-muted-foreground hidden text-end tabular-nums sm:table-cell">
                         {c.threadId && sizes.has(c.threadId)
                           ? formatBytes(sizes.get(c.threadId)!.bytes)
                           : "–"}
                       </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
+                      <TableCell className="text-end font-medium tabular-nums">
                         {formatUsd(c.costUsd)}
                       </TableCell>
                     </TableRow>
@@ -153,47 +153,46 @@ export default async function SettingsPage() {
 
         <section className="flex flex-col gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Database size</h2>
+            <h2 className="text-lg font-semibold">{t.settings.dbSize}</h2>
             <p className="text-muted-foreground text-sm">
-              Read live from MySQL: data plus indexes of this app&apos;s tables. The free instance&apos;s
-              50 GiB is shared with other apps, and backups are not counted here.
+              {t.settings.dbSizeDesc}
             </p>
           </div>
           <Card>
             <CardHeader>
-              <CardDescription>This app&apos;s database</CardDescription>
+              <CardDescription>{t.settings.dbThisApp}</CardDescription>
               <CardTitle className="text-3xl tabular-nums">{formatBytes(db.totalBytes)}</CardTitle>
             </CardHeader>
             <CardContent className="text-muted-foreground text-sm tabular-nums">
-              {db.totalBytes.toLocaleString("en-US")} bytes
+              {formatNumber(db.totalBytes)} {t.settings.bytes}
             </CardContent>
           </Card>
           <div className="rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Table</TableHead>
-                  <TableHead className="hidden text-right sm:table-cell">Rows</TableHead>
-                  <TableHead className="hidden text-right sm:table-cell">Data</TableHead>
-                  <TableHead className="hidden text-right sm:table-cell">Indexes</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>{t.settings.colTable}</TableHead>
+                  <TableHead className="hidden text-end sm:table-cell">{t.settings.colRows}</TableHead>
+                  <TableHead className="hidden text-end sm:table-cell">{t.settings.colData}</TableHead>
+                  <TableHead className="hidden text-end sm:table-cell">{t.settings.colIndexes}</TableHead>
+                  <TableHead className="text-end">{t.settings.colTotal}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {db.tables.map((t) => (
-                  <TableRow key={t.table}>
-                    <TableCell className="font-mono text-xs">{t.table}</TableCell>
-                    <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
-                      {t.rows.toLocaleString("en-US")}
+                {db.tables.map((tbl) => (
+                  <TableRow key={tbl.table}>
+                    <TableCell className="font-mono text-xs">{tbl.table}</TableCell>
+                    <TableCell className="text-muted-foreground hidden text-end tabular-nums sm:table-cell">
+                      {formatNumber(tbl.rows)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
-                      {formatBytes(t.dataBytes)}
+                    <TableCell className="text-muted-foreground hidden text-end tabular-nums sm:table-cell">
+                      {formatBytes(tbl.dataBytes)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground hidden text-right tabular-nums sm:table-cell">
-                      {formatBytes(t.indexBytes)}
+                    <TableCell className="text-muted-foreground hidden text-end tabular-nums sm:table-cell">
+                      {formatBytes(tbl.indexBytes)}
                     </TableCell>
-                    <TableCell className="text-right font-medium tabular-nums">
-                      {formatBytes(t.dataBytes + t.indexBytes)}
+                    <TableCell className="text-end font-medium tabular-nums">
+                      {formatBytes(tbl.dataBytes + tbl.indexBytes)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -201,35 +200,33 @@ export default async function SettingsPage() {
             </Table>
           </div>
           <p className="text-muted-foreground text-xs">
-            The &quot;Stored&quot; column above is the size of each conversation&apos;s message content.
-            MySQL allocates space in 16 KB pages, so each table takes at least 16 KB and small
-            changes show up in steps. Row counts are MySQL&apos;s own approximation; the sizes are exact.
+            {t.settings.dbNote}
           </p>
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">Model and storage</h2>
+          <h2 className="text-lg font-semibold">{t.settings.modelAndStorage}</h2>
           <div className="rounded-lg border">
             <Table>
               <TableBody>
                 <TableRow>
-                  <TableCell className="text-muted-foreground">In use now</TableCell>
-                  <TableCell className="text-right font-mono text-xs">{getChatModelId()}</TableCell>
+                  <TableCell className="text-muted-foreground">{t.settings.inUse}</TableCell>
+                  <TableCell className="text-end font-mono text-xs">{getChatModelId()}</TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell className="text-muted-foreground">Conversations kept for</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-muted-foreground">{t.settings.keptFor}</TableCell>
+                  <TableCell className="text-end">
                     {retentionDays() === 0
-                      ? "Forever"
-                      : `${retentionDays()} days after the last message`}
+                      ? t.settings.forever
+                      : t.settings.retentionDays(retentionDays())}
                   </TableCell>
                 </TableRow>
                 {byModel.map((m) => (
                   <TableRow key={m.model}>
                     <TableCell className="text-muted-foreground">
-                      Spent on <span className="font-mono text-xs">{m.model}</span>
+                      {t.settings.spentOn} <span className="font-mono text-xs">{m.model}</span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatUsd(m.costUsd)}</TableCell>
+                    <TableCell className="text-end tabular-nums">{formatUsd(m.costUsd)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

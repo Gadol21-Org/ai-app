@@ -1,4 +1,5 @@
 "use client"
+import { t } from "@/lib/i18n";
 
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
@@ -65,14 +66,14 @@ function SheetContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-3 right-3"
+                className="absolute top-3 end-3"
                 size="icon-sm"
               />
             }
           >
             <XIcon
             />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{t.sidebar.close}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

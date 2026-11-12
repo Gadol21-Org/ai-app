@@ -1,10 +1,11 @@
 import { deleteThread, getThread, updateThread } from "@/lib/threads";
+import { t } from "@/lib/i18n";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
   const thread = await getThread((await params).id);
-  if (!thread) return Response.json({ error: "not found" }, { status: 404 });
+  if (!thread) return Response.json({ error: t.errors.notFound }, { status: 404 });
   return Response.json(thread);
 }
 

@@ -4,6 +4,7 @@ import {
   upsertMessage,
   type StoredMessage,
 } from "@/lib/threads";
+import { t } from "@/lib/i18n";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -16,7 +17,7 @@ export async function GET(req: Request, { params }: Ctx) {
 export async function PUT(req: Request, { params }: Ctx) {
   const message: StoredMessage = await req.json();
   if (typeof message?.id !== "string" || typeof message?.format !== "string") {
-    return Response.json({ error: "invalid message" }, { status: 400 });
+    return Response.json({ error: t.errors.invalidMessage }, { status: 400 });
   }
   await upsertMessage((await params).id, message);
   return Response.json({ ok: true });

@@ -1,13 +1,14 @@
 import { Cron } from "croner";
-import cronstrue from "cronstrue";
+import cronstrue from "cronstrue/i18n";
+import { LOCALE, t } from "@/lib/i18n";
 
 /** Zone the schedules' cron expressions and "now" are expressed in. */
 export function scheduleTimezone() {
   const tz = process.env.SCHEDULE_TIMEZONE || "UTC";
   try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    new Intl.DateTimeFormat(LOCALE, { timeZone: tz });
   } catch {
-    throw new Error(`Invalid SCHEDULE_TIMEZONE "${tz}". Use an IANA name like Asia/Jerusalem.`);
+    throw new Error(t.schedule.errTimezone(tz));
   }
   return tz;
 }
@@ -15,9 +16,9 @@ export function scheduleTimezone() {
 /** Throws a readable error for an expression croner cannot parse (5 fields, or 6 with seconds). */
 export function validateCron(expression: string, timezone: string) {
   const fields = expression.trim().split(/\s+/).length;
-  if (fields !== 5) throw new Error("Use a 5-field cron expression: minute hour day-of-month month day-of-week.");
+  if (fields !== 5) throw new Error(t.schedule.errCronFields);
   const cron = new Cron(expression, { timezone, paused: true });
-  if (!cron.nextRun()) throw new Error("This cron expression never fires.");
+  if (!cron.nextRun()) throw new Error(t.schedule.errCronNever);
 }
 
 /** The first firing strictly after `from`, or null if there is none. */
@@ -30,22 +31,22 @@ export type ScheduleTiming =
   | { kind: "cron"; cron: string | null; timezone: string };
 
 /** "Every day at 08:00", "Once, 12 Nov 2026 09:00 (Asia/Jerusalem)". */
-export function describeTiming(t: ScheduleTiming, timezone: string): string {
-  if (t.kind === "cron") {
-    let text = t.cron ?? "";
+export function describeTiming(timing: ScheduleTiming, timezone: string): string {
+  if (timing.kind === "cron") {
+    let text = timing.cron ?? "";
     try {
-      text = cronstrue.toString(t.cron ?? "", { use24HourTimeFormat: true });
+      text = cronstrue.toString(timing.cron ?? "", { use24HourTimeFormat: true, locale: "he" });
     } catch {}
-    return `${text} (${t.timezone})`;
+    return `${text} (${timing.timezone})`;
   }
-  const at = t.runAt ? new Date(t.runAt) : null;
-  if (!at || Number.isNaN(at.getTime())) return "Once";
-  const when = new Intl.DateTimeFormat("en-GB", {
+  const at = timing.runAt ? new Date(timing.runAt) : null;
+  if (!at || Number.isNaN(at.getTime())) return t.schedule.once;
+  const when = new Intl.DateTimeFormat(LOCALE, {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: timezone,
   }).format(at);
-  return `Once, ${when} (${timezone})`;
+  return t.schedule.onceAt(when, timezone);
 }
 
 /** "Wednesday 2026-11-11 18:08, UTC+02:00 (Asia/Jerusalem)": what the model needs to resolve "tomorrow at 8". */

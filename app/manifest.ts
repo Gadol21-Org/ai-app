@@ -1,10 +1,13 @@
 import type { MetadataRoute } from "next";
+import { t } from "@/lib/i18n";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Family AI",
-    short_name: "Family AI",
-    description: "Our family's AI assistant",
+    name: t.appName,
+    short_name: t.appName,
+    description: t.appDescription,
+    lang: "he",
+    dir: "rtl",
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -10,6 +10,7 @@ import {
 import { PauseIcon, PlayIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { field, inkButton, mono, paper } from "./surfaces";
+import { t } from "@/lib/i18n";
 
 export interface AudioPlayerProps extends Omit<
   ComponentProps<"div">,
@@ -106,8 +107,8 @@ export function AudioPlayer({
         : { src, currentTime: 0, playing: false, hasError: false }),
       ...patch,
     }));
-  const displayTitle = title ?? "Audio";
-  const playbackLabel = title ? ` ${title}` : " audio";
+  const displayTitle = title ?? t.media.audio;
+  const playbackLabel = title ? ` ${title}` : ` ${t.media.audio}`;
   const durationLabel =
     duration === undefined ? "--:--" : formatDuration(duration);
 
@@ -155,7 +156,7 @@ export function AudioPlayer({
       ) : null}
       <button
         type="button"
-        aria-label={`${playing ? "Pause" : "Play"}${playbackLabel}`}
+        aria-label={`${playing ? t.media.pause : t.media.play}${playbackLabel}`}
         disabled={hasError}
         onClick={togglePlayback}
         className={cn(
@@ -166,7 +167,7 @@ export function AudioPlayer({
         {playing ? (
           <PauseIcon aria-hidden className="size-4" />
         ) : (
-          <PlayIcon aria-hidden className="ml-0.5 size-4" />
+          <PlayIcon aria-hidden className="ms-0.5 size-4 rtl:-scale-x-100" />
         )}
       </button>
       <div className="flex min-w-0 grow basis-16 flex-col gap-1.5">
@@ -179,8 +180,8 @@ export function AudioPlayer({
           max={duration ?? 0}
           step={0.1}
           value={Math.min(currentTime, duration ?? 0)}
-          aria-label="Seek"
-          aria-valuetext={`${formatDuration(currentTime)} of ${durationLabel}`}
+          aria-label={t.media.seek}
+          aria-valuetext={`${formatDuration(currentTime)} ${t.media.of} ${durationLabel}`}
           disabled={hasError}
           onChange={(event) => {
             const nextTime = Number(event.currentTarget.value);
@@ -259,7 +260,7 @@ export function VideoPlayer({
           controls
           playsInline
           preload="metadata"
-          aria-label={title ?? "Video"}
+          aria-label={title ?? t.media.video}
           className={cn(
             "block max-w-full",
             ratio !== "auto" && "h-full w-full object-contain",

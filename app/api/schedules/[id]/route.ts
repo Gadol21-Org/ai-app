@@ -1,11 +1,12 @@
 import { deleteSchedule, getSchedule, setScheduleEnabled } from "@/lib/schedules/store";
+import { t } from "@/lib/i18n";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 /** What the chat's approval card shows before a schedule is deleted. */
 export async function GET(_req: Request, { params }: Ctx) {
   const s = await getSchedule((await params).id);
-  if (!s) return Response.json({ error: "not found" }, { status: 404 });
+  if (!s) return Response.json({ error: t.errors.notFound }, { status: 404 });
   return Response.json({
     id: s.id,
     title: s.title,
@@ -20,10 +21,10 @@ export async function GET(_req: Request, { params }: Ctx) {
 export async function PATCH(req: Request, { params }: Ctx) {
   const { enabled } = await req.json();
   if (typeof enabled !== "boolean") {
-    return Response.json({ error: "enabled must be a boolean" }, { status: 400 });
+    return Response.json({ error: t.errors.enabledBoolean }, { status: 400 });
   }
   const found = await setScheduleEnabled((await params).id, enabled);
-  return found ? Response.json({ ok: true }) : Response.json({ error: "not found" }, { status: 404 });
+  return found ? Response.json({ ok: true }) : Response.json({ error: t.errors.notFound }, { status: 404 });
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
