@@ -48,7 +48,7 @@ export async function runSchedule(schedule: Schedule) {
     return startRun(schedule.id, threadId);
   })();
   try {
-    const tools = getScheduledRunTools();
+    const tools = getScheduledRunTools(threadId);
     const result = await generateText({
       abortSignal: AbortSignal.timeout(RUN_TIMEOUT_MS),
       model: getChatModel(),

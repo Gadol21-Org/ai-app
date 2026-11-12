@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, ChevronLeft } from "lucide-react";
+import { ArrowRight, Bell, CalendarClock, ChevronLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getCurrentUser, displayName } from "@/lib/auth";
+import { listUsers } from "@/lib/users";
+import { formatRelative } from "@/lib/relative-time";
 import { t, formatNumber } from "@/lib/i18n";
 import { formatBytes, formatCount, formatDay, formatUsd } from "@/lib/format";
 import { getChatModelId } from "@/lib/models";
@@ -25,6 +28,7 @@ import { CHAT_MODEL_OPTIONS } from "@/lib/model-catalog";
 import { currentPrice } from "@/lib/pricing";
 import { retentionDays } from "@/lib/retention";
 import { getConversationSizes, getDatabaseSize } from "@/lib/storage";
+import { UserNameForm } from "./users/user-name-form";
 import { getSpendSummary, type SpendTotals } from "@/lib/usage";
 
 export const metadata: Metadata = { title: `${t.settings.pageTitle} · ${t.appName}` };
@@ -48,10 +52,12 @@ function SpendCard({ label, hint, totals }: { label: string; hint: string; total
 }
 
 export default async function SettingsPage() {
-  const [{ allTime, last30Days, byConversation, byModel }, db, sizes] = await Promise.all([
+  const [{ allTime, last30Days, byConversation, byModel, byUser }, db, sizes, me, users] = await Promise.all([
     getSpendSummary(),
     getDatabaseSize(),
     getConversationSizes(),
+    getCurrentUser(),
+    listUsers(),
   ]);
 
   return (
@@ -84,6 +90,41 @@ export default async function SettingsPage() {
           <ChevronLeft className="text-muted-foreground size-4 shrink-0" />
         </Link>
 
+        <Link
+          href="/notifications"
+          className="hover:bg-muted/50 flex items-center gap-3 rounded-lg border p-4 transition-colors"
+        >
+          <Bell className="text-muted-foreground size-5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">{t.notifications.pageTitle}</div>
+            <div className="text-muted-foreground text-sm">{t.notifications.settingsLinkDesc}</div>
+          </div>
+          <ChevronLeft className="text-muted-foreground size-4 shrink-0" />
+        </Link>
+
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">{t.users.title}</h2>
+            <p className="text-muted-foreground text-sm">{t.users.desc}</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            {users.map((u) => (
+              <Card key={u.id}>
+                <CardContent className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{displayName(u)}</span>
+                    {u.id === me?.id && <Badge variant="secondary">{t.users.you}</Badge>}
+                  </div>
+                  <div className="text-muted-foreground text-xs">
+                    <span dir="ltr" className="inline-block">{u.email}</span> · {t.users.lastSeen(formatRelative(u.lastSeenAt))}
+                  </div>
+                  <UserNameForm id={u.id} email={u.email} name={u.name} />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
         <section className="flex flex-col gap-3">
           <div>
             <h2 className="text-lg font-semibold">{t.settings.spend}</h2>
@@ -96,6 +137,24 @@ export default async function SettingsPage() {
             <SpendCard label={t.settings.allTime} hint={t.settings.allTimeHint} totals={allTime} />
           </div>
         </section>
+
+        {users.length > 1 && byUser.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">{t.users.spendByUser}</h2>
+            <div className="rounded-lg border">
+              <Table>
+                <TableBody>
+                  {byUser.map((u) => (
+                    <TableRow key={u.userId ?? "none"}>
+                      <TableCell>{u.email ? displayName({ name: u.name, email: u.email }) : t.users.unknownUser}</TableCell>
+                      <TableCell className="text-end font-medium tabular-nums">{formatUsd(u.costUsd)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
+        )}
 
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">{t.settings.byConversation}</h2>

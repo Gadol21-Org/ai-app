@@ -20,6 +20,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { OpenConversation } from "@/components/open-conversation";
+import { NotificationBell } from "@/components/notification-bell";
 import { t } from "@/lib/i18n";
 
 const useThreadRuntime = () =>
@@ -41,6 +43,7 @@ export const Assistant = ({ timezone }: { timezone: string }) => {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
+      <OpenConversation />
       <ScheduleTimezoneContext.Provider value={timezone}>
         <SidebarProvider>
           <div className="flex h-dvh w-full">
@@ -49,6 +52,7 @@ export const Assistant = ({ timezone }: { timezone: string }) => {
               <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4 pt-[env(safe-area-inset-top)]">
                 <SidebarTrigger />
                 <h1 className="text-sm font-medium">{t.appName}</h1>
+                <NotificationBell />
               </header>
               <div className="flex-1 overflow-hidden">
                 <Thread components={{ ToolFallback: ToolRenderer, ComposerExtra: ModelSelector }} />

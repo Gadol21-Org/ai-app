@@ -41,6 +41,31 @@ MYSQL_URL=mysql://ai_app:<password>@<db-private-ip>:3306/ai_app
 WANDERLOG_COOKIE=s%3A...
 ```
 
+### Users and notifications
+
+**Who is who.** Cloudflare Access (step 2 above) adds the signed-in person's email to every request as
+`Cf-Access-Authenticated-User-Email`, the same way budget-tracking identifies people. The app creates a user the first
+time it sees an email; names can be set in Settings. In production a request without that header has no user and
+`/api/chat` answers 401 (`/api/health` stays open for the container healthcheck). Because the container only listens on
+the VM's `127.0.0.1`, the header can only come from the tunnel. To also verify Cloudflare's signed token, add
+`CF_ACCESS_TEAM_DOMAIN` (e.g. `myteam.cloudflareaccess.com`) and `CF_ACCESS_AUD` (the Access app's Application Audience
+tag) to `AI_APP_ENV`; then the `Cf-Access-Jwt-Assertion` JWT must be valid and match the header email.
+
+**Push notifications.** Generate a VAPID key pair once (`npx web-push generate-vapid-keys`) and add it to `AI_APP_ENV`:
+
+```
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_SUBJECT=mailto:you@example.com
+```
+
+Keep the pair stable: replacing it invalidates every device's subscription (people re-enable in the app). Each person
+turns notifications on per device in **Settings > Notifications** (on iPhone, first add the app to the home screen).
+Payloads are encrypted for each device with its own subscription keys (Web Push, RFC 8291 `aes128gcm`), so the browser
+vendor's push service only relays ciphertext. A copy of each notification is also kept in the app's inbox (database) so
+it can be read even if push never arrives. Tapping a notification opens the conversation that sent it, scrolled to the
+tool call.
+
 ### Database
 
 The app shares budget-tracking's MySQL HeatWave instance (the free tier allows only one), with its own

@@ -4,6 +4,9 @@ import { z } from "zod";
 import { createSchedule, deleteSchedule, getSchedule, listSchedules } from "@/lib/schedules/store";
 import { t } from "@/lib/i18n";
 import { getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
+import { listUsers } from "@/lib/users";
+import { displayName } from "@/lib/auth";
+import { sendNotification } from "@/lib/notifications/service";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
 /**
@@ -11,6 +14,9 @@ import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/
  * whether a scheduled run (which has nobody to ask) may use it. Add new tools here; the chat
  * route and the scheduler both read this registry.
  */
+/** What a tool may need to know about the conversation it runs in. */
+type ToolContext = { threadId?: string; focusToolCall?: boolean };
+
 type AgentTool = {
   tool: ToolSet[string];
   /** The call is shown to the person, and only runs after they allow it. */
@@ -111,29 +117,84 @@ const deleteScheduleTool = tool({
   },
 });
 
+const listUsersTool = tool({
+  description:
+    "List the people who use this app: id, friendly name (null if none was set), email and when they were last seen. " +
+    "Use it to answer questions about the family members and to find the id of a person before notifying them.",
+  inputSchema: z.object({}),
+  execute: async () =>
+    (await listUsers()).map((u) => ({
+      id: u.id,
+      name: u.name,
+      displayName: displayName(u),
+      email: u.email,
+      lastSeenAt: u.lastSeenAt.toISOString(),
+    })),
+});
+
+/** Where the app opens the conversation that sent a notification (and focuses the tool call in it). */
+export function conversationUrl(threadId: string, toolCallId?: string) {
+  const params = new URLSearchParams({ thread: threadId });
+  if (toolCallId) params.set("call", toolCallId);
+  return `/?${params}`;
+}
+
+/** Built per request so the notification can link back to the conversation that sent it. */
+function makeSendNotificationTool(ctx: ToolContext) {
+  return tool({
+    description:
+      "Send a push notification (also kept in the in-app inbox) to everyone or to one person. It is sent immediately without asking, " +
+      "so only send what the user asked for or what a scheduled task is meant to report. " +
+      (ctx.threadId
+        ? "IMPORTANT: when a person taps the notification the app opens THIS conversation, scrolled to this tool call. " +
+          "They will arrive with only the short notification text as context, so in the conversation text around this call (just before and after it) " +
+          "explain in more detail what happened, why you sent the notification, and what, if anything, they need to do. "
+        : "") +
+      "Write the title and body in Hebrew unless the user used another language. Keep them short: the body is a sentence or two.",
+    inputSchema: z.object({
+      recipient: z.string().min(1).describe("\"all\" for every user, or one user's id from list_users."),
+      title: z.string().min(1).max(120).describe("Short headline."),
+      body: z.string().min(1).max(500).describe("The message."),
+    }),
+    execute: async ({ recipient, title, body }, options) => {
+      const all = recipient.trim().toLowerCase() === "all";
+      // Scheduled runs don't store their tool calls, so they link to the conversation only.
+      const url = ctx.threadId ? conversationUrl(ctx.threadId, ctx.focusToolCall ? options.toolCallId : undefined) : undefined;
+      const result = await sendNotification({ title, body, url, userIds: all ? undefined : [recipient.trim()] });
+      if (result.recipients === 0) throw new Error(t.notifications.errNoRecipients);
+      return { sentTo: all ? "all" : recipient, ...result };
+    },
+  });
+}
+
 const registry: Record<string, AgentTool> = {
   add_schedule: { tool: addSchedule, requiresApproval: true, availableInScheduledRuns: false },
   list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
+  list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },
+  send_notification: { tool: makeSendNotificationTool({}), requiresApproval: false, availableInScheduledRuns: true },
   delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
 };
 
-function pick(filter: (t: AgentTool) => boolean): ToolSet {
+function pick(filter: (t: AgentTool) => boolean, ctx: ToolContext): ToolSet {
   return Object.fromEntries(
     Object.entries(registry)
       .filter(([, t]) => filter(t))
-      .map(([name, entry]) => [name, entry.tool]),
+      .map(([name, entry]) => [
+        name,
+        name === "send_notification" ? makeSendNotificationTool(ctx) : entry.tool,
+      ]),
   );
 }
 
 /** Tools for an interactive chat. */
-export async function getChatTools(): Promise<ToolSet> {
+export async function getChatTools(threadId?: string): Promise<ToolSet> {
   // Built-in tools win over an MCP tool with the same name.
-  return { ...(await getMcpTools()), ...pick(() => true) };
+  return { ...(await getMcpTools()), ...pick(() => true, { threadId, focusToolCall: true }) };
 }
 
 /** Tools for a scheduled run: no self-scheduling, so a schedule can never spawn more schedules. */
-export function getScheduledRunTools(): ToolSet {
-  return pick((t) => t.availableInScheduledRuns);
+export function getScheduledRunTools(threadId?: string): ToolSet {
+  return pick((t) => t.availableInScheduledRuns, { threadId });
 }
 
 /**

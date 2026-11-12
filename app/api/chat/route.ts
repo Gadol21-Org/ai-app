@@ -1,4 +1,5 @@
 import { convertToModelMessages, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
+import { displayName, getCurrentUser, unauthorized } from "@/lib/auth";
 import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
@@ -30,6 +31,8 @@ function denyUnansweredApprovals(messages: UIMessage[]): UIMessage[] {
 }
 
 export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return unauthorized();
   const {
     messages,
     id: threadId,
@@ -39,13 +42,13 @@ export async function POST(req: Request) {
   // Remember the pick so reopening the conversation shows (and keeps using) the same model.
   if (threadId) await updateThread(threadId, { model: modelId }).catch(() => {});
 
-  const tools = await getChatTools();
+  const tools = await getChatTools(threadId);
   const allowedTools = threadId ? await getAllowedTools(threadId) : [];
 
   const result = streamText({
     abortSignal: req.signal,
     model: getChatModel(modelId),
-    system: `${SYSTEM_PROMPT}\n\nCurrent time: ${describeNow(scheduleTimezone())}. When a tool call is not approved, do not retry it.`,
+    system: `${SYSTEM_PROMPT}\n\nYou are talking to ${displayName(user)}${user.name ? ` (${user.email})` : ""}. Current time: ${describeNow(scheduleTimezone())}. When a tool call is not approved, do not retry it.`,
     // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
     messages: pruneMessages({
       messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
@@ -58,6 +61,7 @@ export async function POST(req: Request) {
     onFinish: ({ totalUsage }) =>
       recordUsage({
         threadId: threadId ?? null,
+        userId: user.id,
         kind: "chat",
         modelId,
         usage: totalUsage,
