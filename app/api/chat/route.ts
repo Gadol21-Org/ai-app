@@ -1,12 +1,12 @@
 import { convertToModelMessages, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
-import { displayName, getCurrentUser, unauthorized } from "@/lib/auth";
+import { getCurrentUser, unauthorized } from "@/lib/auth";
 import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getToolApproval } from "@/lib/tools";
 import { getAllowedTools, updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
-import { TURN_CONTEXT_INSTRUCTIONS, withTurnContext } from "@/lib/turn-context";
+import { TURN_CONTEXT_INSTRUCTIONS, TURN_CONTEXT_KEY, describeSpeaker, withTurnContexts } from "@/lib/turn-context";
 
 export const maxDuration = 60;
 
@@ -46,19 +46,26 @@ export async function POST(req: Request) {
   const tools = await getChatTools(threadId);
   const allowedTools = threadId ? await getAllowedTools(threadId) : [];
 
+  // Who is writing and when. Older messages replay the note they were first sent with (it rides
+  // on the metadata of each reply), so the history stays byte-identical for the prompt cache.
+  const { messages: withContext, current } = withTurnContexts(denyUnansweredApprovals(messages), {
+    userId: user.id,
+    sentAt: new Date().toISOString(),
+    note: `Current time: ${describeNow(scheduleTimezone())}.\n${describeSpeaker(user)}`,
+  });
+
   const result = streamText({
     abortSignal: req.signal,
     model: getChatModel(modelId),
     // Constant, so the provider's prompt cache can reuse it and the conversation after it.
     system: `${SYSTEM_PROMPT}\n\n${TURN_CONTEXT_INSTRUCTIONS} When a tool call is not approved, do not retry it.`,
-    messages: withTurnContext(
+    messages: pruneMessages({
       // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
-      pruneMessages({
-        messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
-        toolCalls: "before-last-4-messages",
-      }),
-      `Current time: ${describeNow(scheduleTimezone())}.\nWritten by: ${displayName(user)}${user.name ? ` (${user.email})` : ""}.`,
-    ),
+      messages: await convertToModelMessages(
+        withContext,
+      ),
+      toolCalls: "before-last-4-messages",
+    }),
     tools,
     toolApproval: getToolApproval(tools, allowedTools),
     // Building a trip means many tool calls in a row.
@@ -74,6 +81,9 @@ export async function POST(req: Request) {
   });
 
   return result.toUIMessageStreamResponse({
+    // Saved with the reply by the browser, and sent back with the history on later turns.
+    messageMetadata: ({ part }) =>
+      part.type === "start" ? { [TURN_CONTEXT_KEY]: current } : undefined,
     onError: (error) =>
       error instanceof Error ? error.message : String(error),
   });
