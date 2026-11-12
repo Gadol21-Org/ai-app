@@ -15,6 +15,7 @@ import { ThreadListSidebar } from "@/components/assistant-ui/elements/threadlist
 import { ModelSelector } from "@/components/assistant-ui/elements/model-selector";
 import { getSelectedModel } from "@/lib/model-selection";
 import { threadListAdapter } from "@/lib/chat-storage";
+import { toChatRequest } from "@/lib/chat-request";
 import {
   SidebarInset,
   SidebarProvider,
@@ -30,6 +31,9 @@ const useThreadRuntime = () =>
       api: "/api/chat",
       // The model picked in the composer, resolved when each message is sent.
       body: () => ({ model: getSelectedModel() }),
+      prepareSendMessagesRequest: ({ id, messages, body }) => ({
+        body: toChatRequest({ id, messages, body }),
+      }),
     }),
     // Once the person answers an approval card, send the conversation back so the tool runs.
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,

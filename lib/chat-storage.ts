@@ -50,33 +50,25 @@ const toMetadata = (t: ThreadRow) => ({
 const patch = (id: string, body: object) =>
   api(`/${id}`, { method: "PATCH", body: JSON.stringify(body) }).then(() => {});
 
-/** Message history of the thread currently mounted, read and written through the API. */
+/**
+ * Message history of the thread currently mounted. The browser only reads it (and deletes
+ * messages the person removes): the chat endpoint saves every message itself.
+ */
 function useThreadHistory(): ThreadHistoryAdapter {
   const aui = useAui();
   return useMemo(() => {
     // Resolved on every call: the thread gets its id when its first message is sent.
     const existingId = () => aui.threadListItem().getState().remoteId;
-    const ensureId = async () => (await aui.threadListItem().initialize()).remoteId;
+    const nothing = async () => {};
 
     return {
       // Only the formatted adapter below is used by the AI SDK runtime.
       load: async () => ({ messages: [] }),
-      append: async () => {},
+      append: nothing,
 
       withFormat<TMessage, TStorage extends Record<string, unknown>>(
         format: MessageFormatAdapter<TMessage, TStorage>,
       ): GenericThreadHistoryAdapter<TMessage> {
-        const save = async (item: Parameters<typeof format.encode>[0]) => {
-          const id = await ensureId();
-          const entry: MessageStorageEntry<TStorage> = {
-            id: format.getId(item.message),
-            parent_id: item.parentId,
-            format: format.format,
-            content: format.encode(item),
-          };
-          await api(`/${id}/messages`, { method: "PUT", body: JSON.stringify(entry) });
-        };
-
         return {
           async load() {
             const id = existingId();
@@ -86,8 +78,9 @@ function useThreadHistory(): ThreadHistoryAdapter {
             );
             return { messages: messages.map((m) => format.decode(m)) };
           },
-          append: save,
-          update: save,
+          // The runtime reports its messages as they settle; the server already has them.
+          append: nothing,
+          update: nothing,
           async delete(items) {
             const id = existingId();
             if (!id) return;
@@ -118,19 +111,10 @@ export const threadListAdapter: RemoteThreadListAdapter = {
   unarchive: (id) => patch(id, { status: "regular" }),
   delete: (id) => api(`/${id}`, { method: "DELETE" }).then(() => {}),
 
-  /** The server names the conversation with the chat model and saves the title. */
-  async generateTitle(id, messages) {
-    const text = messages
-      .map((m) => {
-        const parts = m.content.flatMap((c) => (c.type === "text" ? [c.text] : []));
-        return `${m.role}: ${parts.join(" ")}`;
-      })
-      .join("\n");
+  /** The server names the conversation with the chat model, from the messages it saved, and saves the title. */
+  async generateTitle(id) {
     return createAssistantStream(async (controller) => {
-      const { title } = await api<{ title: string }>(`/${id}/title`, {
-        method: "POST",
-        body: JSON.stringify({ text }),
-      });
+      const { title } = await api<{ title: string }>(`/${id}/title`, { method: "POST" });
       controller.appendText(title);
     });
   },

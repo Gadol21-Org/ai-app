@@ -6,7 +6,8 @@ import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { getScheduledRunTools, getToolApproval } from "@/lib/tools";
 import { t } from "@/lib/i18n";
 import { formatDateTime } from "@/lib/format";
-import { createThread, upsertMessage } from "@/lib/threads";
+import { createThread, saveUIMessage } from "@/lib/threads";
+import { TURN_CONTEXT_KEY } from "@/lib/turn-context";
 import { recordUsage } from "@/lib/usage";
 import {
   claimDueSchedules,
@@ -28,23 +29,35 @@ export async function runSchedule(schedule: Schedule) {
   const threadId = crypto.randomUUID();
   const userMessageId = crypto.randomUUID();
   const reply = (text: string) =>
-    upsertMessage(threadId, {
-      id: crypto.randomUUID(),
-      parent_id: userMessageId,
-      format: "ai-sdk/v6",
-      content: { role: "assistant", parts: [{ type: "step-start" }, { type: "text", text }] },
-    });
+    saveUIMessage(
+      threadId,
+      { id: crypto.randomUUID(), role: "assistant", parts: [{ type: "step-start" }, { type: "text", text }] },
+      userMessageId,
+    );
+  // What the model is told besides the prompt, kept on the message like a chat turn's context.
+  const context = {
+    userId: null,
+    sentAt: new Date().toISOString(),
+    note:
+      `Scheduled task: "${schedule.title}".\n` +
+      `Current time: ${describeNow(scheduleTimezone())}.\n` +
+      `Written by: nobody; this is an automatic run, so no user is speaking. Use list_users to find who to notify.`,
+  };
   const runId = await (async () => {
     await createThread(threadId, {
       kind: "schedule",
       title: t.schedule.runTitle(schedule.title, formatDateTime(new Date(), schedule.timezone)),
     });
-    await upsertMessage(threadId, {
-      id: userMessageId,
-      parent_id: null,
-      format: "ai-sdk/v6",
-      content: { role: "user", parts: [{ type: "text", text: schedule.prompt }], metadata: { custom: {} } },
-    });
+    await saveUIMessage(
+      threadId,
+      {
+        id: userMessageId,
+        role: "user",
+        parts: [{ type: "text", text: schedule.prompt }],
+        metadata: { [TURN_CONTEXT_KEY]: context },
+      },
+      null,
+    );
     return startRun(schedule.id, threadId);
   })();
   try {
@@ -54,10 +67,7 @@ export async function runSchedule(schedule: Schedule) {
       model: getChatModel(),
       // Constant across runs (cacheable); the run's own details go after the prompt instead.
       system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching, so do not ask questions.`,
-      prompt:
-        `${schedule.prompt}\n\n<context>\nScheduled task: "${schedule.title}".\n` +
-        `Current time: ${describeNow(scheduleTimezone())}.\n` +
-        `Written by: nobody; this is an automatic run, so no user is speaking. Use list_users to find who to notify.\n</context>`,
+      prompt: `${schedule.prompt}\n\n<context>\n${context.note}\n</context>`,
       tools,
       toolApproval: getToolApproval(tools),
       stopWhen: isStepCount(10),
