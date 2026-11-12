@@ -153,12 +153,26 @@
   height: var(--app-height, 100dvh);
 }
 
+/* Full-screen shell glued to the visual viewport (follows the iOS keyboard without jumping). */
+@utility app-shell {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100dvh;
+  height: var(--app-height, 100dvh);
+  transform: translateY(var(--app-top, 0px));
+}
+
 @layer base {
   html,
   body {
     /* The app scrolls inside its own containers; the page itself never moves. */
     overflow: hidden;
     overscroll-behavior: none;
+    position: fixed;
+    inset: 0;
+    width: 100%;
   }
 
   * {

@@ -3,10 +3,11 @@
 import { useEffect } from "react";
 
 /**
- * Keeps `--app-height` equal to the visual viewport height so the on-screen keyboard
- * shrinks the app instead of pushing the whole page up (iOS Safari does not resize the
- * layout viewport for the keyboard). Also undoes the scroll offset iOS applies to the page
- * when it focuses an input, which is what hid the title bar.
+ * Pins the app shell to the visual viewport. iOS Safari doesn't resize the layout viewport
+ * for the keyboard; it scrolls it so the focused input is visible, which pushed the header
+ * away and then snapped back. We mirror the visual viewport's height and offset into CSS
+ * variables on every resize/scroll event, so the fixed shell (`.app-shell`) follows it frame
+ * by frame instead of jumping.
  */
 export function ViewportSync() {
   useEffect(() => {
@@ -15,7 +16,7 @@ export function ViewportSync() {
     const root = document.documentElement;
     const update = () => {
       root.style.setProperty("--app-height", `${vv.height}px`);
-      if (window.scrollY !== 0 || vv.offsetTop !== 0) window.scrollTo(0, 0);
+      root.style.setProperty("--app-top", `${vv.offsetTop}px`);
     };
     update();
     vv.addEventListener("resize", update);
