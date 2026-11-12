@@ -19,7 +19,7 @@ Or `docker compose up --build`. The service worker is registered only in product
 
 ## Choosing the model
 
-The composer has a model selector (Gemini 3.5 Flash Lite, the default, or Gemini 3.8 Flash); the pick is saved per conversation. The options live in [`lib/model-catalog.ts`](lib/model-catalog.ts) and their prices in [`lib/pricing.ts`](lib/pricing.ts). `CHAT_MODEL` (default `google:gemini-3.5-flash-lite`) is the `<provider>:<model>` used for new chats, titles and scheduled runs, resolved in
+The composer has a model selector (Gemini 3.5 Flash Lite, the default, Gemini 3.8 Flash, or Gemini 4 Hydrogen); the pick is saved per conversation. The options live in [`lib/model-catalog.ts`](lib/model-catalog.ts) and their prices in [`lib/pricing.ts`](lib/pricing.ts). `CHAT_MODEL` (default `google:gemini-3.5-flash-lite`) is the `<provider>:<model>` used for new chats, titles and scheduled runs, resolved in
 [`lib/models.ts`](lib/models.ts). To add another provider, install its `@ai-sdk/*` package and add
 one line to the `providers` map; the chat route and UI don't change.
 

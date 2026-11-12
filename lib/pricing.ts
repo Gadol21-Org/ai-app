@@ -15,6 +15,8 @@ const PRICES: Record<string, Price[]> = {
     { from: "2026-01-01", input: 0.75, cachedInput: 0.075, output: 3.75 },
     { from: "2027-01-01", input: 1.5, cachedInput: 0.15, output: 7.5 },
   ],
+  // Price as reported by VentureBeat; not yet confirmed on Google's pricing page.
+  "google:gemini-4-hydrogen": [{ from: "2026-01-01", input: 1.5, cachedInput: 0.075, output: 7.5 }],
 };
 
 export type TokenCounts = {

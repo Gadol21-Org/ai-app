@@ -16,6 +16,11 @@ export const CHAT_MODEL_OPTIONS: ChatModelOption[] = [
     label: "Gemini 3.8 Flash",
     shortLabel: "3.8 Flash",
   },
+  {
+    id: "google:gemini-4-hydrogen",
+    label: "Gemini 4 Hydrogen",
+    shortLabel: "4 Hydrogen",
+  },
 ];
 
 export const DEFAULT_CHAT_MODEL = CHAT_MODEL_OPTIONS[0].id;
