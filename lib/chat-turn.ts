@@ -2,22 +2,7 @@ import "server-only";
 import type { UIMessage } from "ai";
 import { contextOf, TURN_CONTEXT_KEY, type TurnContext } from "@/lib/turn-context";
 import { toUIMessage, type StoredMessage } from "@/lib/threads";
-
-/**
- * What the browser sends to /api/chat. It never sends the history, only the new thing:
- * - a new user message and the message it follows (`parentId`, null for the first message), or
- * - `trigger: "regenerate-message"` with the user message to answer again (`parentId`), or
- * - the answers to approval cards of the assistant message `assistantMessageId`.
- */
-export type ChatRequest = {
-  threadId?: unknown;
-  model?: unknown;
-  trigger?: unknown;
-  message?: unknown;
-  parentId?: unknown;
-  assistantMessageId?: unknown;
-  approvals?: unknown;
-};
+export type { ChatRequest } from "@/lib/chat-request";
 
 export class BadChatRequest extends Error {
   constructor(

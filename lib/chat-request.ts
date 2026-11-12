@@ -1,33 +1,43 @@
 import type { UIMessage } from "ai";
 
 /**
- * The server keeps the conversation, so a chat request carries only what is new: the message just
- * written (and the message it follows, which picks the branch when a message was edited), or the
- * user message to answer again, or the answers to approval cards. Never the history.
- * The matching reader is app/api/chat/route.ts.
+ * What the browser sends to /api/chat. The server keeps the conversation, so the request carries
+ * no history, only the ids of the messages the person is looking at (`ids`, oldest first, which is
+ * all the AI SDK promises about `messages`: the conversation so far) plus what is new:
+ * - a message the server hasn't seen: the new user message, as `message`, or
+ * - a last id the server already has: when it is a user message, the person wants it answered
+ *   again; when it is an assistant message, they answered its approval cards (`approvals`).
+ * The server checks `ids` against its own saved branch, so a browser that has drifted from it
+ * gets an error instead of a reply saved on the wrong branch. The reader is app/api/chat/route.ts.
  */
+export type ChatRequest = {
+  threadId: string;
+  model?: unknown;
+  ids: string[];
+  message?: UIMessage;
+  approvals?: { id: string; approved: boolean; reason?: string }[];
+};
+
 export function toChatRequest({
   id,
   messages,
-  trigger,
   body,
 }: {
   id: string;
   messages: UIMessage[];
-  trigger: "submit-message" | "regenerate-message";
   body?: object;
-}) {
+}): ChatRequest {
   const model = (body as { model?: unknown } | undefined)?.model;
   const last = messages.at(-1);
-  if (trigger === "regenerate-message") return { threadId: id, model, trigger, parentId: last?.id };
+  const request: ChatRequest = { threadId: id, model, ids: messages.map((m) => m.id) };
+  if (last?.role === "user") request.message = last;
   if (last?.role === "assistant") {
-    // Continuing a reply after Allow/Deny: the answers, for the assistant message that asked.
-    const approvals = last.parts.flatMap((part) =>
+    // Answers to the approval cards of the reply that asked.
+    request.approvals = last.parts.flatMap((part) =>
       "state" in part && part.state === "approval-responded" && "approval" in part
         ? [{ id: part.approval.id, approved: part.approval.approved, reason: part.approval.reason }]
         : [],
     );
-    return { threadId: id, model, assistantMessageId: last.id, approvals };
   }
-  return { threadId: id, model, message: last, parentId: messages.at(-2)?.id ?? null };
+  return request;
 }

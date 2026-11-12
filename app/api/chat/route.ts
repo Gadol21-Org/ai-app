@@ -75,43 +75,45 @@ export async function POST(req: Request) {
       return branch.map(toUIMessage);
     };
 
-    if (body.approvals !== undefined) {
+    // The browser says which messages it is showing. Everything before the last one must be
+    // exactly the branch the server has saved; the last one decides what this turn is.
+    const ids = body.ids;
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every(isId)) throw new BadChatRequest("Invalid request.");
+    const lastId = ids[ids.length - 1];
+    const parentId = ids.length > 1 ? ids[ids.length - 2] : null;
+    const saved = parentId === null ? [] : pickBranch(all, parentId)?.map((m) => m.id);
+    if (!saved || saved.join() !== ids.slice(0, -1).join())
+      throw new BadChatRequest("The conversation on screen is out of sync with the saved one. Reload it.", 409);
+    const existing = stored(lastId);
+    if (existing && existing.parent_id !== parentId)
+      throw new BadChatRequest("The conversation on screen is out of sync with the saved one. Reload it.", 409);
+
+    if (existing && toUIMessage(existing).role === "assistant") {
       // The person answered approval cards: continue the assistant message that asked.
-      const target = stored(body.assistantMessageId);
-      if (!target || toUIMessage(target).role !== "assistant") throw new BadChatRequest("Unknown message.");
-      const branch = branchTo(target.id);
+      const branch = branchTo(existing.id);
       const updated = applyApprovals(branch.at(-1)!, parseApprovals(body.approvals));
       if (!updated) throw new BadChatRequest("Nothing is waiting for that answer.", 409);
-      replyParentId = target.parent_id;
+      replyParentId = existing.parent_id;
       history = [...branch.slice(0, -1), updated];
-    } else if (body.trigger === "regenerate-message") {
-      // Answer a user message again: the old reply stays as another branch.
-      const target = stored(body.parentId);
-      if (!isId(body.parentId) || !target || toUIMessage(target).role !== "user") throw new BadChatRequest("Unknown message.");
-      history = branchTo(target.id);
-      replyParentId = target.id;
+    } else if (existing) {
+      // A user message the server already has: answer it again (regenerate), or a retry of a send.
+      // The old reply, if any, stays as another branch. Context stays as it was first saved.
+      history = branchTo(existing.id);
+      replyParentId = existing.id;
       const asked = history.at(-1)!;
       if (!contextOf(asked)) {
         // A conversation from before the context lived on the user message: keep it there from now on.
         const withContext = { ...asked, metadata: { ...(asked.metadata as object), [TURN_CONTEXT_KEY]: backfillContext(all, asked, fresh) } };
-        await saveUIMessage(threadId, withContext, target.parent_id);
+        await saveUIMessage(threadId, withContext, existing.parent_id);
         history = [...history.slice(0, -1), withContext];
       }
     } else {
-      const parentId = body.parentId ?? null;
-      if (parentId !== null && !isId(parentId)) throw new BadChatRequest("Unknown message.");
+      // A new user message.
       const message = parseUserMessage(body.message, fresh);
-      const existing = stored(message.id);
-      if (existing) {
-        // The same message arriving again (a retry): keep what was saved, with its original context.
-        if (toUIMessage(existing).role !== "user" || existing.parent_id !== parentId) throw new BadChatRequest("Message id already used.", 409);
-        history = branchTo(existing.id);
-        replyParentId = existing.id;
-      } else {
-        history = [...branchTo(parentId), message];
-        await saveUIMessage(threadId, message, parentId);
-        replyParentId = message.id;
-      }
+      if (message.id !== lastId) throw new BadChatRequest("Invalid message.");
+      history = [...branchTo(parentId), message];
+      await saveUIMessage(threadId, message, parentId);
+      replyParentId = message.id;
     }
   } catch (error) {
     if (error instanceof BadChatRequest) return Response.json({ error: error.message }, { status: error.status });

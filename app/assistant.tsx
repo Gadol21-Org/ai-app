@@ -31,8 +31,8 @@ const useThreadRuntime = () =>
       api: "/api/chat",
       // The model picked in the composer, resolved when each message is sent.
       body: () => ({ model: getSelectedModel() }),
-      prepareSendMessagesRequest: ({ id, messages, trigger, body }) => ({
-        body: toChatRequest({ id, messages, trigger, body }),
+      prepareSendMessagesRequest: ({ id, messages, body }) => ({
+        body: toChatRequest({ id, messages, body }),
       }),
     }),
     // Once the person answers an approval card, send the conversation back so the tool runs.
