@@ -29,6 +29,13 @@
       "when": 1794456660130,
       "tag": "0003_thread_allowed_tools",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1794457465452,
+      "tag": "0004_users_notifications",
+      "breakpoints": true
     }
   ]
 }

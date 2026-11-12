@@ -159,7 +159,7 @@ export const DeleteScheduleTool: ToolCallMessagePartComponent = (props) => {
 };
 
 /** Custom UI for specific tools; every other tool keeps the default collapsible card. */
-export const ToolRenderer: ToolCallMessagePartComponent = (props) =>
+const renderTool: ToolCallMessagePartComponent = (props) =>
   props.toolName === "add_schedule" ? (
     <AddScheduleTool {...props} />
   ) : props.toolName === "delete_schedule" ? (
@@ -167,3 +167,13 @@ export const ToolRenderer: ToolCallMessagePartComponent = (props) =>
   ) : (
     <ToolFallback {...props} />
   );
+
+/** Marks each tool call with its id so a notification link can scroll to it. */
+export const ToolRenderer: ToolCallMessagePartComponent = (props) => {
+  const Tool = renderTool;
+  return (
+    <div data-tool-call-id={props.toolCallId} className="rounded-lg">
+      <Tool {...props} />
+    </div>
+  );
+};

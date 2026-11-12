@@ -1,10 +1,12 @@
 import { convertToModelMessages, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
+import { displayName, getCurrentUser, unauthorized } from "@/lib/auth";
 import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getToolApproval } from "@/lib/tools";
 import { getAllowedTools, updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
+import { TURN_CONTEXT_INSTRUCTIONS, withTurnContext } from "@/lib/turn-context";
 
 export const maxDuration = 60;
 
@@ -30,6 +32,8 @@ function denyUnansweredApprovals(messages: UIMessage[]): UIMessage[] {
 }
 
 export async function POST(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) return unauthorized();
   const {
     messages,
     id: threadId,
@@ -39,18 +43,22 @@ export async function POST(req: Request) {
   // Remember the pick so reopening the conversation shows (and keeps using) the same model.
   if (threadId) await updateThread(threadId, { model: modelId }).catch(() => {});
 
-  const tools = await getChatTools();
+  const tools = await getChatTools(threadId);
   const allowedTools = threadId ? await getAllowedTools(threadId) : [];
 
   const result = streamText({
     abortSignal: req.signal,
     model: getChatModel(modelId),
-    system: `${SYSTEM_PROMPT}\n\nCurrent time: ${describeNow(scheduleTimezone())}. When a tool call is not approved, do not retry it.`,
-    // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
-    messages: pruneMessages({
-      messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
-      toolCalls: "before-last-4-messages",
-    }),
+    // Constant, so the provider's prompt cache can reuse it and the conversation after it.
+    system: `${SYSTEM_PROMPT}\n\n${TURN_CONTEXT_INSTRUCTIONS} When a tool call is not approved, do not retry it.`,
+    messages: withTurnContext(
+      // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
+      pruneMessages({
+        messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
+        toolCalls: "before-last-4-messages",
+      }),
+      `Current time: ${describeNow(scheduleTimezone())}.\nWritten by: ${displayName(user)}${user.name ? ` (${user.email})` : ""}.`,
+    ),
     tools,
     toolApproval: getToolApproval(tools, allowedTools),
     // Building a trip means many tool calls in a row.
@@ -58,6 +66,7 @@ export async function POST(req: Request) {
     onFinish: ({ totalUsage }) =>
       recordUsage({
         threadId: threadId ?? null,
+        userId: user.id,
         kind: "chat",
         modelId,
         usage: totalUsage,

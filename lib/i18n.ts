@@ -261,6 +261,47 @@ export const t = {
     spentOn: "הוצא על",
   },
 
+  users: {
+    title: "משתמשים",
+    desc: "האנשים שנכנסו לאפליקציה. הזיהוי נעשה לפי כתובת המייל שאיתה נכנסתם דרך Cloudflare. שם ידידותי מופיע במקום המייל, והעוזר משתמש בו כדי לפנות אליכם ולשלוח התראות.",
+    you: "אתם",
+    namePlaceholder: "שם ידידותי",
+    nameLabel: (email: string) => `שם ידידותי עבור ${email}`,
+    save: "שמירה",
+    saved: "נשמר",
+    lastSeen: (when: string) => `נראה לאחרונה ${when}`,
+    spendByUser: "הוצאות לפי משתמש",
+    unknownUser: "לא משויך",
+  },
+
+  notifications: {
+    pageTitle: "התראות",
+    backToChat: "חזרה לשיחה",
+    bell: "התראות",
+    bellUnread: (n: number) => `התראות (${n} שלא נקראו)`,
+    intro: "הודעות שהעוזר שלח אליכם. הן נשמרות כאן גם אם התראת הדחיפה לא הגיעה.",
+    empty: "אין התראות עדיין.",
+    markAllRead: "סימון הכול כנקרא",
+    approvalTitle: "ממתין לאישור שלכם",
+    approvalBody: (title: string) => `ההנחיה המתוזמנת "${title}" צריכה את אישורכם כדי להמשיך.`,
+    settingsLinkDesc: "התראות שהעוזר שלח אליכם, והפעלת התראות דחיפה במכשיר הזה.",
+    pushTitle: "התראות דחיפה במכשיר הזה",
+    pushDesc:
+      "ההתראות נשלחות מוצפנות במפתח של המכשיר הזה, כך ששירות הדחיפה של הדפדפן לא רואה את התוכן. בכל מכשיר צריך להפעיל בנפרד.",
+    pushEnable: "הפעלת התראות",
+    pushDisable: "כיבוי התראות",
+    pushOn: "התראות דחיפה פעילות במכשיר הזה.",
+    pushOff: "התראות דחיפה כבויות במכשיר הזה.",
+    pushUnsupported: "הדפדפן הזה לא תומך בהתראות דחיפה. באייפון צריך קודם להוסיף את האפליקציה למסך הבית.",
+    pushDenied: "ההתראות חסומות בדפדפן. אפשר לאשר אותן בהגדרות האתר.",
+    pushNotConfigured: "התראות דחיפה עדיין לא הוגדרו בשרת (מפתחות VAPID). ההתראות יופיעו כאן בתוך האפליקציה.",
+    pushError: "לא הצלחנו להפעיל התראות. נסו שוב.",
+    pushTest: "שליחת התראת בדיקה",
+    testTitle: "התראת בדיקה",
+    testBody: "אם אתם רואים את זה, ההתראות עובדות.",
+    errNoRecipients: "לא נמצא אף נמען. יש להשתמש ב-list_users כדי לקבל מזהים, או לכתוב \"all\".",
+  },
+
   errors: {
     invalidId: "מזהה לא תקין",
     notFound: "לא נמצא",
@@ -271,6 +312,8 @@ export const t = {
   /** Hebrew names for agent tools; a tool without an entry is shown by its code name. */
   toolNames: {
     list_schedules: "רשימת תזמונים",
+    list_users: "רשימת משתמשים",
+    send_notification: "שליחת התראה",
     wanderlog_list_trips: "רשימת הטיולים",
     wanderlog_get_trip: "פרטי טיול",
     wanderlog_get_trip_url: "קישור לטיול",

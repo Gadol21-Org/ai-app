@@ -30,6 +30,8 @@ export const threads = mysqlTable(
     model: varchar("model", { length: 128 }),
     /** Tools the person allowed to run without asking for the rest of this conversation. */
     allowedTools: json("allowed_tools").$type<string[]>(),
+    /** Who started the conversation (null for conversations from before users existed, and scheduled runs). */
+    userId: varchar("user_id", { length: 36 }),
     createdAt: createdAt(),
     lastMessageAt: timestamp("last_message_at", { fsp: 3 }).notNull().defaultNow(),
   },
@@ -57,6 +59,8 @@ export const usageEvents = mysqlTable(
   {
     id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
     threadId: varchar("thread_id", { length: 64 }),
+    /** Who triggered the call (null for scheduled runs and older records). */
+    userId: varchar("user_id", { length: 36 }),
     kind: mysqlEnum("kind", ["chat", "title", "schedule"]).notNull().default("chat"),
     model: varchar("model", { length: 128 }).notNull(),
     inputTokens: int("input_tokens").notNull().default(0),
@@ -135,4 +139,51 @@ export const pendingApprovals = mysqlTable(
     resolvedAt: timestamp("resolved_at", { fsp: 3 }),
   },
   (t) => [index("pending_approvals_status").on(t.status, t.createdAt)],
+);
+
+/** A person using the app, identified by the email Cloudflare Access puts on each request. */
+export const users = mysqlTable(
+  "users",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    /** Stored lower-cased. */
+    email: varchar("email", { length: 255 }).notNull(),
+    /** Friendly name shown instead of the email; editable in Settings. */
+    name: varchar("name", { length: 80 }),
+    createdAt: createdAt(),
+    lastSeenAt: timestamp("last_seen_at", { fsp: 3 }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("users_email").on(t.email)],
+);
+
+/** A message for one person, kept so it can be read in the app even when push never arrived. */
+export const notifications = mysqlTable(
+  "notifications",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    userId: varchar("user_id", { length: 36 }).notNull(),
+    title: varchar("title", { length: 120 }).notNull(),
+    body: text("body").notNull(),
+    /** Where tapping the notification goes (a path inside the app). */
+    url: varchar("url", { length: 255 }).notNull().default("/notifications"),
+    readAt: timestamp("read_at", { fsp: 3 }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("notifications_user").on(t.userId, t.createdAt)],
+);
+
+/** One browser/device that agreed to receive Web Push for a person. */
+export const pushSubscriptions = mysqlTable(
+  "push_subscriptions",
+  {
+    id: bigint("id", { mode: "number", unsigned: true }).autoincrement().primaryKey(),
+    userId: varchar("user_id", { length: 36 }).notNull(),
+    endpoint: varchar("endpoint", { length: 600 }).notNull(),
+    /** The device's public key; payloads are encrypted to it (RFC 8291). */
+    p256dh: varchar("p256dh", { length: 255 }).notNull(),
+    auth: varchar("auth", { length: 64 }).notNull(),
+    userAgent: varchar("user_agent", { length: 255 }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("push_endpoint").on(t.endpoint), index("push_user").on(t.userId)],
 );

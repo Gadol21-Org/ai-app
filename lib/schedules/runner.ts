@@ -48,14 +48,15 @@ export async function runSchedule(schedule: Schedule) {
     return startRun(schedule.id, threadId);
   })();
   try {
-    const tools = getScheduledRunTools();
+    const tools = getScheduledRunTools(threadId);
     const result = await generateText({
       abortSignal: AbortSignal.timeout(RUN_TIMEOUT_MS),
       model: getChatModel(),
-      system:
-        `${SYSTEM_PROMPT}\n\nThis is a scheduled task titled "${schedule.title}" running automatically; ` +
-        `nobody is watching, so do not ask questions. Current time: ${describeNow(scheduleTimezone())}.`,
-      prompt: schedule.prompt,
+      // Constant across runs (cacheable); the run's own details go after the prompt instead.
+      system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching, so do not ask questions.`,
+      prompt:
+        `${schedule.prompt}\n\n<context>\nScheduled task: "${schedule.title}".\n` +
+        `Current time: ${describeNow(scheduleTimezone())}.\n</context>`,
       tools,
       toolApproval: getToolApproval(tools),
       stopWhen: isStepCount(10),

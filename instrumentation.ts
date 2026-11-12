@@ -7,6 +7,10 @@ export async function register() {
   await migrate(getDb(), { migrationsFolder: "./drizzle" });
   console.log("database migrations applied");
 
+  const { setNotifier } = await import("@/lib/approvals/notifier");
+  const { pushNotifier } = await import("@/lib/notifications/notifier");
+  setNotifier(pushNotifier);
+
   const { startScheduler } = await import("@/lib/schedules/runner");
   await startScheduler();
 

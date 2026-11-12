@@ -4,11 +4,12 @@ import { desc, eq, gte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { costUsd, toTokenCounts } from "@/lib/pricing";
 
-const { usageEvents, threads } = schema;
+const { usageEvents, threads, users } = schema;
 
 /** Record one model call. Never throws: losing a usage row must not break a chat. */
 export async function recordUsage(opts: {
   threadId: string | null;
+  userId?: string | null;
   kind: "chat" | "title" | "schedule";
   modelId: string;
   usage: LanguageModelUsage;
@@ -21,6 +22,7 @@ export async function recordUsage(opts: {
       .insert(usageEvents)
       .values({
         threadId: opts.threadId,
+        userId: opts.userId ?? null,
         kind: opts.kind,
         model: opts.modelId,
         ...tokens,
@@ -49,7 +51,7 @@ export type ConversationSpend = SpendTotals & {
 export async function getSpendSummary() {
   const db = getDb();
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [[allTime], [last30Days], byConversation, byModel] = await Promise.all([
+  const [[allTime], [last30Days], byConversation, byModel, byUser] = await Promise.all([
     db.select(totals).from(usageEvents),
     db.select(totals).from(usageEvents).where(gte(usageEvents.createdAt, since)),
     db
@@ -70,6 +72,17 @@ export async function getSpendSummary() {
       .from(usageEvents)
       .groupBy(usageEvents.model)
       .orderBy(desc(totals.costUsd)),
+    db
+      .select({
+        userId: usageEvents.userId,
+        name: sql<string | null>`max(${users.name})`,
+        email: sql<string | null>`max(${users.email})`,
+        ...totals,
+      })
+      .from(usageEvents)
+      .leftJoin(users, eq(users.id, usageEvents.userId))
+      .groupBy(usageEvents.userId)
+      .orderBy(desc(totals.costUsd)),
   ]);
-  return { allTime, last30Days, byConversation: byConversation as ConversationSpend[], byModel };
+  return { allTime, last30Days, byConversation: byConversation as ConversationSpend[], byModel, byUser };
 }

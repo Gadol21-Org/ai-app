@@ -38,10 +38,10 @@ export async function getThread(id: string) {
 }
 
 /** Idempotent: the client may initialize the same thread more than once. */
-export async function createThread(id: string, opts: { kind?: "chat" | "schedule"; title?: string; model?: string } = {}) {
+export async function createThread(id: string, opts: { kind?: "chat" | "schedule"; title?: string; model?: string; userId?: string } = {}) {
   await getDb()
     .insert(threads)
-    .values({ id, kind: opts.kind ?? "chat", title: opts.title, model: opts.model })
+    .values({ id, kind: opts.kind ?? "chat", title: opts.title, model: opts.model, userId: opts.userId })
     .onDuplicateKeyUpdate({ set: { id } });
 }
 
