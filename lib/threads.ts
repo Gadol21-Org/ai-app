@@ -16,6 +16,7 @@ const threadColumns = {
   title: threads.title,
   status: threads.status,
   kind: threads.kind,
+  model: threads.model,
   lastMessageAt: threads.lastMessageAt,
 };
 
@@ -37,18 +38,18 @@ export async function getThread(id: string) {
 }
 
 /** Idempotent: the client may initialize the same thread more than once. */
-export async function createThread(id: string, opts: { kind?: "chat" | "schedule"; title?: string } = {}) {
+export async function createThread(id: string, opts: { kind?: "chat" | "schedule"; title?: string; model?: string } = {}) {
   await getDb()
     .insert(threads)
-    .values({ id, kind: opts.kind ?? "chat", title: opts.title })
+    .values({ id, kind: opts.kind ?? "chat", title: opts.title, model: opts.model })
     .onDuplicateKeyUpdate({ set: { id } });
 }
 
 export async function updateThread(
   id: string,
-  patch: { title?: string; status?: "regular" | "archived" },
+  patch: { title?: string; status?: "regular" | "archived"; model?: string },
 ) {
-  if (patch.title === undefined && patch.status === undefined) return;
+  if (patch.title === undefined && patch.status === undefined && patch.model === undefined) return;
   await getDb().update(threads).set(patch).where(eq(threads.id, id));
 }
 

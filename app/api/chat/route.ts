@@ -1,8 +1,9 @@
 import { convertToModelMessages, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
-import { getChatModel, getChatModelId } from "@/lib/models";
+import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getToolApproval } from "@/lib/tools";
+import { updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
 
 export const maxDuration = 60;
@@ -29,14 +30,20 @@ function denyUnansweredApprovals(messages: UIMessage[]): UIMessage[] {
 }
 
 export async function POST(req: Request) {
-  const { messages, id: threadId }: { messages: UIMessage[]; id?: string } =
-    await req.json();
+  const {
+    messages,
+    id: threadId,
+    model,
+  }: { messages: UIMessage[]; id?: string; model?: unknown } = await req.json();
+  const modelId = resolveChatModelId(model);
+  // Remember the pick so reopening the conversation shows (and keeps using) the same model.
+  if (threadId) await updateThread(threadId, { model: modelId }).catch(() => {});
 
   const tools = await getChatTools();
 
   const result = streamText({
     abortSignal: req.signal,
-    model: getChatModel(),
+    model: getChatModel(modelId),
     system: `${SYSTEM_PROMPT}\n\nCurrent time: ${describeNow(scheduleTimezone())}. When a tool call is not approved, do not retry it.`,
     // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
     messages: pruneMessages({
@@ -51,7 +58,7 @@ export async function POST(req: Request) {
       recordUsage({
         threadId: threadId ?? null,
         kind: "chat",
-        modelId: getChatModelId(),
+        modelId,
         usage: totalUsage,
       }),
   });

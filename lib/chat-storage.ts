@@ -8,6 +8,7 @@ import {
   type RemoteThreadListAdapter,
   type ThreadHistoryAdapter,
 } from "@assistant-ui/react";
+import { getSelectedModel } from "@/lib/model-selection";
 import { createAssistantStream } from "assistant-stream";
 import { useMemo } from "react";
 
@@ -109,7 +110,7 @@ export const threadListAdapter: RemoteThreadListAdapter = {
   },
   async initialize() {
     const id = crypto.randomUUID();
-    await api("", { method: "POST", body: JSON.stringify({ id }) });
+    await api("", { method: "POST", body: JSON.stringify({ id, model: getSelectedModel() }) });
     return { remoteId: id, externalId: undefined };
   },
   rename: (id, title) => patch(id, { title }),

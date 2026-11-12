@@ -21,6 +21,8 @@ import {
 import { t, formatNumber } from "@/lib/i18n";
 import { formatBytes, formatCount, formatDay, formatUsd } from "@/lib/format";
 import { getChatModelId } from "@/lib/models";
+import { CHAT_MODEL_OPTIONS } from "@/lib/model-catalog";
+import { currentPrice } from "@/lib/pricing";
 import { retentionDays } from "@/lib/retention";
 import { getConversationSizes, getDatabaseSize } from "@/lib/storage";
 import { getSpendSummary, type SpendTotals } from "@/lib/usage";
@@ -213,6 +215,25 @@ export default async function SettingsPage() {
                   <TableCell className="text-muted-foreground">{t.settings.inUse}</TableCell>
                   <TableCell className="text-end font-mono text-xs">{getChatModelId()}</TableCell>
                 </TableRow>
+                {CHAT_MODEL_OPTIONS.map((m) => {
+                  const price = currentPrice(m.id);
+                  return (
+                    <TableRow key={m.id}>
+                      <TableCell className="text-muted-foreground">
+                        {t.settings.availableModels}
+                        <div className="font-mono text-xs">{m.id}</div>
+                      </TableCell>
+                      <TableCell className="text-end text-xs">
+                        {m.label}
+                        {price ? (
+                          <div className="text-muted-foreground">
+                            {t.settings.priceLine(formatUsd(price.input), formatUsd(price.output))}
+                          </div>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 <TableRow>
                   <TableCell className="text-muted-foreground">{t.settings.keptFor}</TableCell>
                   <TableCell className="text-end">

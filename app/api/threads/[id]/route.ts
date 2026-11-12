@@ -1,4 +1,5 @@
 import { deleteThread, getThread, updateThread } from "@/lib/threads";
+import { isSelectableModel } from "@/lib/model-catalog";
 import { t } from "@/lib/i18n";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -10,11 +11,12 @@ export async function GET(_req: Request, { params }: Ctx) {
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {
-  const body: { title?: unknown; status?: unknown } = await req.json();
+  const body: { title?: unknown; status?: unknown; model?: unknown } = await req.json();
   await updateThread((await params).id, {
     title: typeof body.title === "string" ? body.title.slice(0, 255) : undefined,
     status:
       body.status === "regular" || body.status === "archived" ? body.status : undefined,
+    model: isSelectableModel(body.model) ? body.model : undefined,
   });
   return Response.json({ ok: true });
 }
