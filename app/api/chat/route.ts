@@ -6,6 +6,7 @@ import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getToolApproval } from "@/lib/tools";
 import { getAllowedTools, updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
+import { TURN_CONTEXT_INSTRUCTIONS, withTurnContext } from "@/lib/turn-context";
 
 export const maxDuration = 60;
 
@@ -48,12 +49,16 @@ export async function POST(req: Request) {
   const result = streamText({
     abortSignal: req.signal,
     model: getChatModel(modelId),
-    system: `${SYSTEM_PROMPT}\n\nYou are talking to ${displayName(user)}${user.name ? ` (${user.email})` : ""}. Current time: ${describeNow(scheduleTimezone())}. When a tool call is not approved, do not retry it.`,
-    // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
-    messages: pruneMessages({
-      messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
-      toolCalls: "before-last-4-messages",
-    }),
+    // Constant, so the provider's prompt cache can reuse it and the conversation after it.
+    system: `${SYSTEM_PROMPT}\n\n${TURN_CONTEXT_INSTRUCTIONS} When a tool call is not approved, do not retry it.`,
+    messages: withTurnContext(
+      // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
+      pruneMessages({
+        messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
+        toolCalls: "before-last-4-messages",
+      }),
+      `Current time: ${describeNow(scheduleTimezone())}.\nWritten by: ${displayName(user)}${user.name ? ` (${user.email})` : ""}.`,
+    ),
     tools,
     toolApproval: getToolApproval(tools, allowedTools),
     // Building a trip means many tool calls in a row.
