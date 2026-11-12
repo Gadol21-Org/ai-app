@@ -1,12 +1,12 @@
 import { convertToModelMessages, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
-import { displayName, getCurrentUser, unauthorized } from "@/lib/auth";
+import { getCurrentUser, unauthorized } from "@/lib/auth";
 import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getToolApproval } from "@/lib/tools";
 import { getAllowedTools, updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
-import { TURN_CONTEXT_INSTRUCTIONS, withTurnContext } from "@/lib/turn-context";
+import { TURN_CONTEXT_INSTRUCTIONS, describeSpeaker, withTurnContext } from "@/lib/turn-context";
 
 export const maxDuration = 60;
 
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
         messages: await convertToModelMessages(denyUnansweredApprovals(messages)),
         toolCalls: "before-last-4-messages",
       }),
-      `Current time: ${describeNow(scheduleTimezone())}.\nWritten by: ${displayName(user)}${user.name ? ` (${user.email})` : ""}.`,
+      `Current time: ${describeNow(scheduleTimezone())}.\n${describeSpeaker(user)}`,
     ),
     tools,
     toolApproval: getToolApproval(tools, allowedTools),

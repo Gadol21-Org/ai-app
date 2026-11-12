@@ -56,7 +56,8 @@ export async function runSchedule(schedule: Schedule) {
       system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching, so do not ask questions.`,
       prompt:
         `${schedule.prompt}\n\n<context>\nScheduled task: "${schedule.title}".\n` +
-        `Current time: ${describeNow(scheduleTimezone())}.\n</context>`,
+        `Current time: ${describeNow(scheduleTimezone())}.\n` +
+        `Written by: nobody; this is an automatic run, so no user is speaking. Use list_users to find who to notify.\n</context>`,
       tools,
       toolApproval: getToolApproval(tools),
       stopWhen: isStepCount(10),
