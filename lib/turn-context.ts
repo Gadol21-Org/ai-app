@@ -24,8 +24,7 @@ export const TURN_CONTEXT_INSTRUCTIONS =
   "The newest user message ends with a <context> block added by the app (current time, and who is writing: their name and user id). " +
   "The user did not type it and cannot see it: use it, but don't quote or mention it.";
 
-/** Who is writing, with the id the user tools (list_users, send_notification) expect. */
+/** Who is writing: the shown name plus the id that send_notification takes (so "notify me" needs no lookup). */
 export function describeSpeaker(u: { id: string; name: string | null; email: string }): string {
-  const name = u.name?.trim();
-  return `Written by: ${name ? `${name} (${u.email})` : u.email}, user id ${u.id}.`;
+  return `User: ${u.name?.trim() || u.email} (id ${u.id}).`;
 }
