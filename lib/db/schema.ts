@@ -26,6 +26,8 @@ export const threads = mysqlTable(
       .default("regular"),
     /** "schedule" threads hold the conversation a scheduled run produced; the sidebar lists them apart. */
     kind: mysqlEnum("kind", ["chat", "schedule"]).notNull().default("chat"),
+    /** `provider:model` picked for this conversation; null means the default model. */
+    model: varchar("model", { length: 128 }),
     createdAt: createdAt(),
     lastMessageAt: timestamp("last_message_at", { fsp: 3 }).notNull().defaultNow(),
   },

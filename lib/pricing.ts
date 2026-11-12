@@ -10,6 +10,7 @@ type Price = { from: string; input: number; cachedInput: number; output: number 
  * Source: https://ai.google.dev/gemini-api/docs/pricing (standard paid tier).
  */
 const PRICES: Record<string, Price[]> = {
+  "google:gemini-3.5-flash-lite": [{ from: "2026-01-01", input: 0.3, cachedInput: 0.03, output: 2.5 }],
   "google:gemini-3.8-flash": [
     { from: "2026-01-01", input: 0.75, cachedInput: 0.075, output: 3.75 },
     { from: "2027-01-01", input: 1.5, cachedInput: 0.15, output: 7.5 },
@@ -42,4 +43,10 @@ export function costUsd(modelId: string, t: TokenCounts, at = new Date()): numbe
       t.outputTokens * price.output) /
     1_000_000
   );
+}
+
+/** The price in force today, for display. */
+export function currentPrice(modelId: string, at = new Date()): Price | undefined {
+  const day = at.toISOString().slice(0, 10);
+  return PRICES[modelId]?.filter((p) => p.from <= day).at(-1);
 }
