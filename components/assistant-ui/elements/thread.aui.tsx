@@ -193,13 +193,13 @@ const ThreadHistorySkeleton: FC = () => (
     className="animate-in fade-in fill-mode-both flex flex-col gap-y-6 [animation-delay:150ms] [animation-duration:200ms]"
   >
     <span className="sr-only">{t.chat.loadingConversation}</span>
-    <Skeleton className="ms-auto h-9 w-2/5 rounded-xl motion-reduce:animate-none" />
+    <Skeleton className="me-auto h-9 w-2/5 rounded-xl motion-reduce:animate-none" />
     <div className="flex flex-col gap-y-2">
       <Skeleton className="h-4 w-11/12 motion-reduce:animate-none" />
       <Skeleton className="h-4 w-4/5 motion-reduce:animate-none" />
       <Skeleton className="h-4 w-3/5 motion-reduce:animate-none" />
     </div>
-    <Skeleton className="ms-auto h-9 w-1/3 rounded-xl motion-reduce:animate-none" />
+    <Skeleton className="me-auto h-9 w-1/3 rounded-xl motion-reduce:animate-none" />
     <div className="flex flex-col gap-y-2">
       <Skeleton className="h-4 w-10/12 motion-reduce:animate-none" />
       <Skeleton className="h-4 w-2/3 motion-reduce:animate-none" />
@@ -754,25 +754,25 @@ const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root
       data-slot="aui_user-message-root"
-      className="fade-in slide-in-from-bottom-1 animate-in grid auto-rows-auto grid-cols-[minmax(72px,1fr)_auto] content-start gap-y-2 px-2 duration-150 [contain-intrinsic-size:auto_200px] [content-visibility:auto] [&:where(>*)]:col-start-2"
+      className="fade-in slide-in-from-bottom-1 animate-in grid auto-rows-auto grid-cols-[auto_minmax(72px,1fr)] content-start gap-y-2 px-2 duration-150 [contain-intrinsic-size:auto_200px] [content-visibility:auto] [&:where(>*)]:col-start-1"
       data-role="user"
     >
       <UserMessageAttachments />
 
-      <div className="aui-user-message-content-wrapper relative col-start-2 min-w-0">
+      <div className="aui-user-message-content-wrapper relative col-start-1 min-w-0">
         <div className="aui-user-message-content peer bg-muted text-foreground rounded-(--composer-radius) px-4 py-2 wrap-break-word empty:hidden">
           <MessagePrimitive.Parts
             components={{ File: UserFilePart, Image: UserImagePart }}
           />
         </div>
-        <div className="aui-user-action-bar-wrapper absolute start-0 top-1/2 -translate-x-full -translate-y-1/2 pe-2 peer-empty:hidden rtl:translate-x-full">
+        <div className="aui-user-action-bar-wrapper absolute left-0 top-1/2 -translate-x-full -translate-y-1/2 ps-2 peer-empty:hidden">
           <UserActionBar />
         </div>
       </div>
 
       <BranchPicker
         data-slot="aui_user-branch-picker"
-        className="col-span-full col-start-1 -me-1 justify-end"
+        className="col-span-full col-start-1 -ms-1 justify-start"
       />
     </MessagePrimitive.Root>
   );
@@ -783,7 +783,7 @@ const UserActionBar: FC = () => {
     <ActionBarPrimitive.Root
       hideWhenRunning
       autohide="not-last"
-      className="aui-user-action-bar-root flex flex-col items-end"
+      className="aui-user-action-bar-root flex flex-col items-start"
     >
       <ActionBarPrimitive.Edit render={<TooltipIconButton tooltip={t.chat.edit} className="aui-user-action-edit" />}><PencilIcon /></ActionBarPrimitive.Edit>
     </ActionBarPrimitive.Root>
@@ -796,7 +796,7 @@ const EditComposer: FC = () => {
       data-slot="aui_edit-composer-wrapper"
       className="flex flex-col px-2 [contain-intrinsic-size:auto_200px] [content-visibility:auto]"
     >
-      <ComposerPrimitive.Root className="aui-edit-composer-root border-foreground/10 focus-within:border-foreground/25 ms-auto flex w-full max-w-[85%] cursor-text flex-col rounded-(--composer-radius) border bg-(--composer-bg) transition-[border-color]">
+      <ComposerPrimitive.Root className="aui-edit-composer-root border-foreground/10 focus-within:border-foreground/25 me-auto flex w-full max-w-[85%] cursor-text flex-col rounded-(--composer-radius) border bg-(--composer-bg) transition-[border-color]">
         <ComposerPrimitive.Input
                       dir="auto"
           className="aui-edit-composer-input text-foreground min-h-14 w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base outline-none"
