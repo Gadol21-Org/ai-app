@@ -400,6 +400,7 @@ export const t = {
     uploadBadType: "אפשר להעלות רק JPEG, PNG או WebP.",
     uploadFailed: "ההעלאה נכשלה. נסו שוב.",
     noPresenterNote: "לא הועלתה תמונת מגישה. יש לבקש מהמשתמש להעלות תמונה בהגדרות > ספריית מדיה.",
+    errNoVoice: "לא הוגדר קול ברירת מחדל. יש לבחור קול עם list_voices או לבקש מהמשתמש מזהה קול.",
     errNoPresenter: "לא הועלתה תמונת מגישה. יש להעלות תמונה בהגדרות > ספריית מדיה, ואין ליצור פנים אחרות.",
     errNotPresenter: (id: string) => `קובץ המדיה ${id} אינו תמונת מגישה שהועלתה. יש להשתמש ב-list_presenters.`,
     errNotFound: (id: string) => `לא נמצא קובץ מדיה עם המזהה ${id}.`,

@@ -22,6 +22,8 @@ const ttsModel = () => {
   const configured = process.env.ELEVENLABS_TTS_MODEL?.trim();
   return (TTS_MODELS as readonly string[]).includes(configured ?? "") ? configured! : "eleven_v4";
 };
+/** The family's voice for ads (e.g. a cloned voice), used when the model isn't told another. */
+const defaultVoiceId = () => process.env.ELEVENLABS_DEFAULT_VOICE_ID?.trim() || undefined;
 const IMAGE_MODEL = () => process.env.ELEVENLABS_IMAGE_MODEL?.trim() || "gemini-3.1-flash-image";
 const LIPSYNC_MODEL = "creatify-aurora";
 const SCENE_MODEL = () => process.env.ELEVENLABS_SCENE_MODEL?.trim() || "veo-3.1-fast-generate-001";
@@ -69,7 +71,7 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
   const listVoices = tool({
     description:
       "Search the ElevenLabs voices available for speech (name, gender/age/accent/language labels, description). " +
-      "Use it to pick a voice for generate_speech. Leave 'search' empty for the account's default list.",
+      "Use it to pick a voice for generate_speech, unless the user named a voice id or a default voice is configured (then do not search; just omit voiceId). Leave 'search' empty for the account's default list.",
     inputSchema: z.object({
       search: z.string().max(100).optional().describe("Free text: a name, language, accent or style, e.g. 'hebrew female warm'."),
     }),
@@ -88,11 +90,17 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
       "Keep ads short: 15-30 seconds is about 40-90 Hebrew words.",
     inputSchema: z.object({
       script: z.string().min(1).max(2000).describe("The exact words to speak, in the language of the ad."),
-      voiceId: z.string().min(1).describe("A voice id from list_voices."),
+      voiceId: z
+        .string()
+        .min(1)
+        .optional()
+        .describe("A voice id, from list_voices or given by the user (their own cloned voice included). Omit to use the family's default voice, if one is configured."),
       title: z.string().min(1).max(120).describe("Short name for the file, written in Hebrew."),
       languageCode: z.string().length(2).optional().describe("ISO 639-1 code to force, e.g. 'he'. Omit to detect it from the text."),
     }),
-    execute: async ({ script, voiceId, title, languageCode }) => {
+    execute: async ({ script, voiceId: requestedVoice, title, languageCode }) => {
+      const voiceId = requestedVoice ?? defaultVoiceId();
+      if (!voiceId) throw new Error(t.mediaLibrary.errNoVoice);
       const model = ttsModel();
       const lang = languageCode && model !== "eleven_multilingual_v2" ? languageCode : undefined;
       // Eleven v4 is served by the dialogue endpoint; the older models by the flows speech endpoint.

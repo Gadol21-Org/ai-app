@@ -88,7 +88,7 @@ accepts these uploads, so the model can't swap in a generated face (`generate_im
 `ELEVENLABS_ALLOW_GENERATED_PRESENTER=1`). Without an uploaded photo the agent asks you to upload one.
 
 1. The model writes the spoken script.
-2. `list_voices`, then `generate_speech` turns the script into audio (ElevenLabs **Eleven v4**, its best speech
+2. `list_voices` (or a voice id you give, or `ELEVENLABS_DEFAULT_VOICE_ID`), then `generate_speech` turns the script into audio (ElevenLabs **Eleven v4**, its best speech
    model, which supports Hebrew and audio tags like `[excited]`; v4 is served by the text-to-dialogue endpoint, older
    models by the flows speech endpoint). Scribe is ElevenLabs' speech-to-text model, so it is not used here.
 3. `list_presenters` shows the uploaded photos.
