@@ -137,6 +137,7 @@ const messageGroupBy = groupPartByType({
   reasoning: ["group-chainOfThought", "group-reasoning"],
   // A chart is the answer itself, so it sits in the message instead of inside the collapsed tool group.
   "tool-call:render_chart": [],
+  "tool-call:present": [],
   "tool-call": ["group-chainOfThought", "group-tool"],
   "standalone-tool-call": [],
 });

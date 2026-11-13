@@ -13,8 +13,7 @@ export const MAX_SERIES = 6;
 
 const cell = z.union([z.string(), z.number(), z.null()]);
 
-export const chartSpecSchema = z
-  .object({
+const chartFields = {
     type: z
       .enum(CHART_TYPES)
       .describe(
@@ -89,8 +88,17 @@ export const chartSpecSchema = z
       .max(12)
       .optional()
       .describe("A unit shown after values, such as ₪ or %."),
-  })
-  .superRefine((spec, ctx) => {
+  };
+
+type ChartCheckInput = {
+  type: (typeof CHART_TYPES)[number];
+  xKey: string;
+  series: { key: string; label: string }[];
+  data: Record<string, string | number | null>[];
+};
+
+/** Checks that the rows actually match the declared keys, so a bad call fails before anything is drawn. */
+function checkChart(spec: ChartCheckInput, ctx: z.RefinementCtx) {
     if (
       (spec.type === "pie" || spec.type === "scatter") &&
       spec.series.length !== 1
@@ -138,7 +146,18 @@ export const chartSpecSchema = z
         });
       }
     });
-  });
+}
+
+export const chartSpecSchema = z.object(chartFields).superRefine(checkChart);
+
+/**
+ * The chart as a piece of generative UI. The surrounding Card or Header carries the title, so this
+ * has no title or description of its own, which also keeps its props from clashing with theirs.
+ */
+export const dataChartSchema = z
+  .object(chartFields)
+  .omit({ title: true, description: true })
+  .superRefine(checkChart);
 
 export type ChartSpec = z.infer<typeof chartSpecSchema>;
 

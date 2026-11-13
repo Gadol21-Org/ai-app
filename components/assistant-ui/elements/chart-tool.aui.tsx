@@ -27,7 +27,8 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { type ChartSpec, chartSpecSchema } from "@/lib/chart-spec";
+import { chartSpecSchema, type dataChartSchema } from "@/lib/chart-spec";
+import type { z } from "zod";
 import { LOCALE, t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -56,10 +57,13 @@ const withUnit = (value: number, unit?: string) =>
  * right-to-left page Recharts mirrors the axis labels but not the marks, which would put each
  * label under the wrong bar. The title and legend text around it stay right-to-left.
  */
+/** What the plot needs: a `render_chart` spec without its title and description. */
+export type ChartData = z.infer<typeof dataChartSchema>;
+
 export const ChartView = memo(function ChartView({
   spec,
 }: {
-  spec: ChartSpec;
+  spec: ChartData;
 }) {
   const { type, xKey, series, data, stacked, unit } = spec;
   const config = useMemo<ChartConfig>(() => {

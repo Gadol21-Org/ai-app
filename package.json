@@ -17,6 +17,7 @@
     "@ai-sdk/google": "^4.0.117",
     "@ai-sdk/mcp": "^2.0.96",
     "@assistant-ui/ai-sdk": "0.0.18",
+    "@assistant-ui/generative-ui": "^0.0.11",
     "@assistant-ui/react": "0.15.34",
     "@assistant-ui/react-markdown": "^0.14.25",
     "@base-ui/react": "^1.9.0",
