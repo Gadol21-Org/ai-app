@@ -67,6 +67,7 @@ tapping Allow/Deny on an approval card, that counts as Deny.
   restarts and a firing missed during downtime runs once on startup. Repeats use cron expressions
   ([croner](https://github.com/Hexagon/croner)) in `SCHEDULE_TIMEZONE`.
 - Tools live in `lib/tools.ts`, which also says which need approval and which scheduled runs may use.
+- `render_chart` draws line, bar, area, pie and scatter charts from data the model passes in (`lib/chart-spec.ts` is the spec, `components/assistant-ui/elements/chart-tool.aui.tsx` draws it with Recharts).
   Scheduled runs cannot add schedules.
 - **Approvals in scheduled runs.** A scheduled run gets the same tools as a chat (except self-scheduling). When it
   reaches a tool that needs approval it stops cleanly: the conversation is saved with the approval card, the run is

@@ -164,6 +164,13 @@ export const t = {
     back: "חזרה",
   },
 
+  chart: {
+    drawing: "מצייר גרף…",
+    failed: "לא הצלחתי לצייר את הגרף.",
+    noData: "אין נתונים להצגה.",
+    chartLabel: (title: string) => `גרף: ${title}`,
+  },
+
   schedule: {
     addTitle: "הוספת הנחיה מתוזמנת",
     deleteTitle: "מחיקת הנחיה מתוזמנת",
