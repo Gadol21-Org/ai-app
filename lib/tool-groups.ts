@@ -35,7 +35,7 @@ export const KNOWN_GROUPS: Record<string, Omit<ToolGroupInfo, "id">> = {
       "(changes always wait for a person's approval). Enable it for tasks about ad performance or about creating or updating ads.",
   },
   wanderlog: {
-    label: "Wanderlog: טיולים",
+    label: "וונדרלוג",
     description: "The family's Wanderlog trip plans: read trips, places and itineraries and edit them (edits wait for a person's approval).",
   },
   charts: {
