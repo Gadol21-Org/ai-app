@@ -32,6 +32,7 @@ import {
   settlePartialReply,
   type ChatRequest,
 } from "@/lib/chat-turn";
+import { ApprovalConflict, claimApprovals, settleRunsOfThread, trackApprovals } from "@/lib/approvals/pending";
 import { t } from "@/lib/i18n";
 
 export const maxDuration = 60;
@@ -49,7 +50,8 @@ export async function POST(req: Request) {
   const body: ChatRequest = await req.json();
   const { threadId } = body;
   if (!isId(threadId)) return Response.json({ error: t.errors.invalidId }, { status: 400 });
-  if (!(await getThread(threadId))) return Response.json({ error: t.errors.notFound }, { status: 404 });
+  const thread = await getThread(threadId);
+  if (!thread) return Response.json({ error: t.errors.notFound }, { status: 404 });
 
   const modelId = resolveChatModelId(body.model);
   // Remember the pick so reopening the conversation shows (and keeps using) the same model.
@@ -91,8 +93,16 @@ export async function POST(req: Request) {
     if (existing && toUIMessage(existing).role === "assistant") {
       // The person answered approval cards: continue the assistant message that asked.
       const branch = branchTo(existing.id);
-      const updated = applyApprovals(branch.at(-1)!, parseApprovals(body.approvals));
+      const answers = parseApprovals(body.approvals);
+      const updated = applyApprovals(branch.at(-1)!, answers);
       if (!updated) throw new BadChatRequest("Nothing is waiting for that answer.", 409);
+      // Where several people can answer (a scheduled run's card), the first answer wins.
+      try {
+        await claimApprovals(threadId, answers, user.id);
+      } catch (error) {
+        if (error instanceof ApprovalConflict) throw new BadChatRequest(error.message, 409);
+        throw error;
+      }
       replyParentId = existing.parent_id;
       history = [...branch.slice(0, -1), updated];
     } else if (existing) {
@@ -161,6 +171,11 @@ export async function POST(req: Request) {
       try {
         await saveUIMessage(threadId, message, replyParentId);
         replyParentId = message.id;
+        if (thread.kind === "schedule") {
+          // A resumed scheduled run may reach another approval card; track it, and close the run when none is left.
+          await trackApprovals(message, { threadId });
+          await settleRunsOfThread(threadId);
+        }
       } catch (error) {
         console.error("saving the reply failed", error);
       }

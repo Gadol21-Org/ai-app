@@ -198,7 +198,8 @@ export const t = {
     genericError: "משהו השתבש. נסו שוב.",
     backToSettings: "חזרה להגדרות",
     runTitle: (title: string, when: string) => `${title} (${when})`,
-    runNeedsApproval: "ההרצה הזו צריכה את אישורכם כדי להמשיך.",
+    approvalTaken: "מישהו כבר ענה על הבקשה הזו.",
+    approvalExpired: "הבקשה פגה כי לא נענתה בזמן.",
     runNoReply: "(אין תשובה.)",
     runFailed: (message: string) => `ההרצה המתוזמנת נכשלה: ${message}`,
     runPromptSuffix: (title: string, now: string) =>
@@ -283,7 +284,10 @@ export const t = {
     empty: "אין התראות עדיין.",
     markAllRead: "סימון הכול כנקרא",
     approvalTitle: "ממתין לאישור שלכם",
-    approvalBody: (title: string) => `ההנחיה המתוזמנת "${title}" צריכה את אישורכם כדי להמשיך.`,
+    approvalBody: (title: string, count = 1) =>
+      count > 1
+        ? `ההנחיה המתוזמנת "${title}" ממתינה ל-${count} אישורים שלכם. פתחו את השיחה כדי להחליט.`
+        : `ההנחיה המתוזמנת "${title}" צריכה את אישורכם כדי להמשיך. פתחו את השיחה כדי להחליט.`,
     settingsLinkDesc: "התראות שהעוזר שלח אליכם, והפעלת התראות דחיפה במכשיר הזה.",
     pushTitle: "התראות דחיפה במכשיר הזה",
     pushDesc:

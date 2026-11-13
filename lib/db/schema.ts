@@ -117,29 +117,32 @@ export const scheduleRuns = mysqlTable(
 );
 
 /**
- * A tool call that is waiting for a person to allow it. Chat approvals live in the conversation
- * itself; this table is for work with nobody at the screen (a scheduled run), so a notifier can
- * reach the person and the decision can be made later.
+ * An approval card in a scheduled run's conversation that is waiting for a person. The card itself
+ * lives in the conversation; this row lets the app notify people, make sure only one person's
+ * answer counts (the first one claims it), and expire cards nobody answers.
  */
 export const pendingApprovals = mysqlTable(
   "pending_approvals",
   {
-    id: varchar("id", { length: 36 }).primaryKey(),
-    source: mysqlEnum("source", ["schedule"]).notNull(),
-    /** The schedule (and run) that is blocked on this decision. */
-    sourceId: varchar("source_id", { length: 36 }).notNull(),
+    /** The approval id from the conversation's tool part. */
+    id: varchar("id", { length: 64 }).primaryKey(),
+    threadId: varchar("thread_id", { length: 64 }).notNull(),
+    /** The schedule and run that are blocked on this decision, when the card came from one. */
+    scheduleId: varchar("schedule_id", { length: 36 }),
     runId: bigint("run_id", { mode: "number", unsigned: true }),
     toolName: varchar("tool_name", { length: 128 }).notNull(),
-    title: varchar("title", { length: 255 }).notNull(),
-    /** The tool call's input, shown to the person when they decide. */
-    input: json("input").notNull(),
     status: mysqlEnum("status", ["pending", "approved", "denied", "expired"])
       .notNull()
       .default("pending"),
+    /** Who answered (null while pending or when it expired). */
+    resolvedBy: varchar("resolved_by", { length: 36 }),
     createdAt: createdAt(),
     resolvedAt: timestamp("resolved_at", { fsp: 3 }),
   },
-  (t) => [index("pending_approvals_status").on(t.status, t.createdAt)],
+  (t) => [
+    index("pending_approvals_status").on(t.status, t.createdAt),
+    index("pending_approvals_thread").on(t.threadId),
+  ],
 );
 
 /** A person using the app, identified by the email Cloudflare Access puts on each request. */

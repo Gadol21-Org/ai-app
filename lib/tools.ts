@@ -8,12 +8,13 @@ import { listUsers } from "@/lib/users";
 import { displayName } from "@/lib/auth";
 import { makeAdTools } from "@/lib/elevenlabs/tools";
 import { makeMetaAdTools } from "@/lib/meta/tools";
+import { conversationUrl } from "@/lib/conversation-url";
 import { sendNotification } from "@/lib/notifications/service";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
 /**
  * The agent's tools. Each entry says whether a person must allow a call before it runs and
- * whether a scheduled run (which has nobody to ask) may use it. Add new tools here; the chat
+ * whether a scheduled run may use it (one that needs approval parks at its card until someone answers). Add new tools here; the chat
  * route and the scheduler both read this registry.
  */
 /** What a tool may need to know about the conversation it runs in. */
@@ -134,13 +135,6 @@ const listUsersTool = tool({
     })),
 });
 
-/** Where the app opens the conversation that sent a notification (and focuses the tool call in it). */
-export function conversationUrl(threadId: string, toolCallId?: string) {
-  const params = new URLSearchParams({ thread: threadId });
-  if (toolCallId) params.set("call", toolCallId);
-  return `/?${params}`;
-}
-
 /** Built per request so the notification can link back to the conversation that sent it. */
 function makeSendNotificationTool(ctx: ToolContext) {
   return tool({
@@ -160,7 +154,6 @@ function makeSendNotificationTool(ctx: ToolContext) {
     }),
     execute: async ({ recipient, title, body }, options) => {
       const all = recipient.trim().toLowerCase() === "all";
-      // Scheduled runs don't store their tool calls, so they link to the conversation only.
       const url = ctx.threadId ? conversationUrl(ctx.threadId, ctx.focusToolCall ? options.toolCallId : undefined) : undefined;
       const result = await sendNotification({ title, body, url, userIds: all ? undefined : [recipient.trim()] });
       if (result.recipients === 0) throw new Error(t.notifications.errNoRecipients);
@@ -198,9 +191,13 @@ export async function getChatTools(threadId?: string): Promise<ToolSet> {
   return { ...(await getMcpTools()), ...pick(() => true, { threadId, focusToolCall: true }) };
 }
 
-/** Tools for a scheduled run: no self-scheduling, so a schedule can never spawn more schedules. */
-export function getScheduledRunTools(threadId?: string): ToolSet {
-  return pick((t) => t.availableInScheduledRuns, { threadId });
+/**
+ * Tools for a scheduled run: the same as a chat's, except no self-scheduling (so a schedule can
+ * never spawn more schedules). Tools that need approval are included: the run stops at the card
+ * and waits for someone to answer it in the saved conversation.
+ */
+export async function getScheduledRunTools(threadId?: string): Promise<ToolSet> {
+  return { ...(await getMcpTools()), ...pick((t) => t.availableInScheduledRuns, { threadId, focusToolCall: true }) };
 }
 
 /**
