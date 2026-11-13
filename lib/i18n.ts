@@ -164,6 +164,13 @@ export const t = {
     back: "חזרה",
   },
 
+  chart: {
+    drawing: "מצייר גרף…",
+    failed: "לא הצלחתי לצייר את הגרף.",
+    noData: "אין נתונים להצגה.",
+    chartLabel: (title: string) => `גרף: ${title}`,
+  },
+
   schedule: {
     addTitle: "הוספת הנחיה מתוזמנת",
     deleteTitle: "מחיקת הנחיה מתוזמנת",
@@ -212,6 +219,16 @@ export const t = {
     errCronNever: "ביטוי ה-cron הזה לעולם לא מופעל.",
     errTimezone: (tz: string) => `SCHEDULE_TIMEZONE לא תקין: "${tz}". יש להשתמש בשם IANA כמו Asia/Jerusalem.`,
     errNotFound: "לא נמצא תזמון עם המזהה הזה.",
+    errGroupsList: "toolGroups חייב להיות רשימה של מזהי קבוצות כלים.",
+    errUnknownGroups: (unknown: string[], known: string[]) =>
+      `קבוצות כלים לא מוכרות: ${unknown.join(", ")}. הקבוצות הקיימות: ${known.join(", ")}.`,
+    groupsLabel: "כלים שההרצה יכולה להשתמש בהם",
+    groupsNone: "ללא כלים",
+    groupsEdit: "עריכת הקבוצות",
+    groupsLegacy: "תזמון ישן ללא רשימת קבוצות: כל הקבוצות פעילות. סימון ושמירה יקבעו רשימה מפורשת.",
+    groupsLoading: "טוען קבוצות…",
+    groupsSaved: "נשמר",
+    groupsApprovalNote: "גם כשקבוצה פעילה, כלי שדורש אישור עדיין ימתין לאישור בכל הרצה.",
     interrupted: "הופסק עקב הפעלה מחדש של השרת.",
   },
 

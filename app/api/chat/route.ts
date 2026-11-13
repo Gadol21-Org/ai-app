@@ -3,7 +3,8 @@ import { getCurrentUser, unauthorized } from "@/lib/auth";
 import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
-import { getChatTools, getToolApproval } from "@/lib/tools";
+import { getChatTools, getScheduledRunTools, getToolApproval } from "@/lib/tools";
+import { toolGroupsOfRunThread } from "@/lib/schedules/store";
 import {
   getAllowedTools,
   getThread,
@@ -68,6 +69,8 @@ export async function POST(req: Request) {
   let history: UIMessage[];
   // Where the reply hangs: the message this turn continues (after an approval) keeps its own parent.
   let replyParentId: string | null;
+  // The turn picks up where a scheduled run stopped at an approval card.
+  let resumesRun = false;
   try {
     const all = await listUIMessages(threadId);
     const stored = (id: unknown) => all.find((m) => m.id === id);
@@ -105,6 +108,7 @@ export async function POST(req: Request) {
       }
       replyParentId = existing.parent_id;
       history = [...branch.slice(0, -1), updated];
+      resumesRun = thread.kind === "schedule";
     } else if (existing) {
       // A user message the server already has: answer it again (regenerate), or a retry of a send.
       // The old reply, if any, stays as another branch. Context stays as it was first saved.
@@ -130,7 +134,9 @@ export async function POST(req: Request) {
     throw error;
   }
 
-  const tools = await getChatTools(threadId);
+  // A resumed run keeps the tool groups its schedule was given; anything typed in the conversation is an ordinary chat.
+  const runGroups = resumesRun ? await toolGroupsOfRunThread(threadId) : null;
+  const tools = runGroups ? await getScheduledRunTools(threadId, runGroups) : await getChatTools(threadId);
   const allowedTools = await getAllowedTools(threadId);
 
   const result = streamText({

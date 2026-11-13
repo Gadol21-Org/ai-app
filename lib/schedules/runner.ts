@@ -41,6 +41,7 @@ export async function runSchedule(schedule: Schedule) {
     note:
       `Scheduled task: "${schedule.title}".\n` +
       `Current time: ${describeNow(scheduleTimezone())}.\n` +
+      `Tool groups enabled for this task: ${schedule.toolGroups ? schedule.toolGroups.join(", ") || "none" : "all"}.\n` +
       `Written by: nobody; this is an automatic run, so no user is speaking. Use list_users to find who to notify.`,
   };
   const runId = await (async () => {
@@ -61,7 +62,7 @@ export async function runSchedule(schedule: Schedule) {
     return startRun(schedule.id, threadId);
   })();
   try {
-    const tools = await getScheduledRunTools(threadId);
+    const tools = await getScheduledRunTools(threadId, schedule.toolGroups);
     const modelId = getChatModelId();
     const result = streamText({
       abortSignal: AbortSignal.timeout(RUN_TIMEOUT_MS),

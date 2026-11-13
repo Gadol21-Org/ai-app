@@ -1,4 +1,4 @@
-import { deleteSchedule, getSchedule, setScheduleEnabled } from "@/lib/schedules/store";
+import { deleteSchedule, enabledToolGroups, getSchedule, setScheduleEnabled, setScheduleToolGroups } from "@/lib/schedules/store";
 import { t } from "@/lib/i18n";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -15,15 +15,29 @@ export async function GET(_req: Request, { params }: Ctx) {
     cron: s.cron,
     runAt: s.runAt,
     timezone: s.timezone,
+    toolGroups: enabledToolGroups(s),
   });
 }
 
+/** Pause or resume (`enabled`), and/or change the tool groups a run may use (`toolGroups`). */
 export async function PATCH(req: Request, { params }: Ctx) {
-  const { enabled } = await req.json();
-  if (typeof enabled !== "boolean") {
+  const { id } = await params;
+  const { enabled, toolGroups } = await req.json();
+  if (enabled === undefined && toolGroups === undefined) {
     return Response.json({ error: t.errors.enabledBoolean }, { status: 400 });
   }
-  const found = await setScheduleEnabled((await params).id, enabled);
+  if (enabled !== undefined && typeof enabled !== "boolean") {
+    return Response.json({ error: t.errors.enabledBoolean }, { status: 400 });
+  }
+  let found = !!(await getSchedule(id));
+  if (found && toolGroups !== undefined) {
+    try {
+      await setScheduleToolGroups(id, toolGroups);
+    } catch (error) {
+      return Response.json({ error: (error as Error).message }, { status: 400 });
+    }
+  }
+  if (found && enabled !== undefined) found = await setScheduleEnabled(id, enabled);
   return found ? Response.json({ ok: true }) : Response.json({ error: t.errors.notFound }, { status: 404 });
 }
 

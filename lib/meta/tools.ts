@@ -12,7 +12,7 @@ import { createPausedVideoAd, getVideoState, isMetaConfigured, uploadVideo } fro
  * what it can't: getting a generated video into the ad account and building an ad from it.
  * Both change the ad account, so both always ask first, and the ad is created PAUSED.
  */
-export function makeMetaAdTools(): Record<string, AgentTool> {
+export function makeMetaAdTools(): Record<string, Omit<AgentTool, "group">> {
   if (!isMetaConfigured()) return {};
 
   const uploadAdVideo = tool({

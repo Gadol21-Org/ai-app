@@ -40,6 +40,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { t, toolDisplayName } from "@/lib/i18n";
+import { TOOL_GROUPS_REASON_PREFIX } from "@/lib/tool-groups";
 import { MediaPreview, type MediaPreviewProps } from "@/components/media-preview";
 
 const ANIMATION_DURATION = 200;
@@ -474,7 +475,9 @@ function ToolFallbackApprovalReceipt({
   const notes = [
     ...new Set(
       [approval.text, approval.reason].filter(
-        (value): value is string => typeof value === "string" && value !== "",
+        // A card's own data riding in the reason (the chosen tool groups) is not a note to show.
+        (value): value is string =>
+          typeof value === "string" && value !== "" && !value.startsWith(TOOL_GROUPS_REASON_PREFIX),
       ),
     ),
   ];
@@ -717,6 +720,8 @@ type ToolFallbackApprovalProps = React.ComponentPropsWithoutRef<"div"> &
     approval?: ToolCallMessagePart["approval"];
     /** Name of the tool being asked about; with it the card offers "allow in this conversation". */
     allowInConversationFor?: string;
+    /** Sent with an Allow as the answer's `reason`, for cards that let the person adjust what is approved. */
+    approveReason?: string;
   };
 
 const ToolFallbackApproval = forwardRef<
@@ -745,6 +750,7 @@ function ToolFallbackApprovalImpl({
   respondToApproval,
   status,
   allowInConversationFor,
+  approveReason,
   ...props
 }: Omit<ToolFallbackApprovalProps, "ref"> & {
   forwardedRef: React.ForwardedRef<HTMLDivElement>;
@@ -897,7 +903,7 @@ function ToolFallbackApprovalImpl({
       approval.approved === undefined &&
       respondToApproval
     ) {
-      submit(() => respondToApproval({ approved, ...typedNote() }));
+      submit(() => respondToApproval({ approved, ...typedNote(), ...(approved && approveReason ? { reason: approveReason } : {}) }));
     } else if (interrupt) {
       submit(() => resume?.({ approved }));
     } else if (
@@ -940,7 +946,7 @@ function ToolFallbackApprovalImpl({
           })
         : undefined;
       if (!res?.ok) throw new Error(t.tool.allowInConversationFailed);
-      await respondToApproval({ approved: true, ...typedNote() });
+      await respondToApproval({ approved: true, ...typedNote(), ...(approveReason ? { reason: approveReason } : {}) });
     });
   };
 

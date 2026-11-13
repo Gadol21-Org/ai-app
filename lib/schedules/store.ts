@@ -3,6 +3,7 @@ import { and, asc, desc, eq, isNotNull, lte } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { nextCronRun, scheduleTimezone, validateCron } from "./timing";
 import { t } from "@/lib/i18n";
+import { listScheduleToolGroups } from "@/lib/tools";
 
 const { schedules, scheduleRuns } = schema;
 
@@ -10,8 +11,30 @@ export type Schedule = typeof schedules.$inferSelect;
 export type ScheduleRun = typeof scheduleRuns.$inferSelect;
 
 export type NewSchedule =
-  | { title: string; prompt: string; kind: "once"; runAt: Date }
-  | { title: string; prompt: string; kind: "cron"; cron: string };
+  | { title: string; prompt: string; toolGroups: string[]; kind: "once"; runAt: Date }
+  | { title: string; prompt: string; toolGroups: string[]; kind: "cron"; cron: string };
+
+/** Unknown ids are an error, so a typo can't silently leave a task without the tools it needs. */
+export function checkToolGroups(ids: unknown): string[] {
+  const known = listScheduleToolGroups().map((g) => g.id);
+  if (!Array.isArray(ids) || !ids.every((g) => typeof g === "string")) throw new Error(t.schedule.errGroupsList);
+  const unknown = ids.filter((g) => !known.includes(g));
+  if (unknown.length > 0) throw new Error(t.schedule.errUnknownGroups(unknown, known));
+  return [...new Set(ids as string[])];
+}
+
+/**
+ * Which groups a run may use. A schedule made before groups existed (null) keeps them all, which
+ * is what it could do until now; approval-gated tools still ask either way.
+ */
+export function enabledToolGroups(s: Pick<Schedule, "toolGroups">): string[] {
+  return s.toolGroups ?? listScheduleToolGroups().map((g) => g.id);
+}
+
+export async function setScheduleToolGroups(id: string, ids: unknown) {
+  const toolGroups = checkToolGroups(ids);
+  await getDb().update(schedules).set({ toolGroups }).where(eq(schedules.id, id));
+}
 
 export async function createSchedule(input: NewSchedule) {
   const timezone = scheduleTimezone();
@@ -19,6 +42,7 @@ export async function createSchedule(input: NewSchedule) {
   const prompt = input.prompt.trim();
   if (!title) throw new Error(t.schedule.errTitle);
   if (!prompt) throw new Error(t.schedule.errPrompt);
+  const toolGroups = checkToolGroups(input.toolGroups);
 
   let nextRunAt: Date | null;
   if (input.kind === "once") {
@@ -36,6 +60,7 @@ export async function createSchedule(input: NewSchedule) {
       id,
       title,
       prompt,
+      toolGroups,
       kind: input.kind,
       runAt: input.kind === "once" ? input.runAt : null,
       cron: input.kind === "cron" ? input.cron.trim() : null,
@@ -135,4 +160,18 @@ export async function failInterruptedRuns() {
     .update(scheduleRuns)
     .set({ status: "error", error: t.schedule.interrupted, finishedAt: new Date() })
     .where(eq(scheduleRuns.status, "running"));
+}
+
+/**
+ * The groups of the schedule whose run produced this conversation: null when the conversation is
+ * not a run (or its schedule is gone, or predates groups), meaning no restriction.
+ */
+export async function toolGroupsOfRunThread(threadId: string): Promise<string[] | null> {
+  const [row] = await getDb()
+    .select({ toolGroups: schedules.toolGroups })
+    .from(scheduleRuns)
+    .innerJoin(schedules, eq(schedules.id, scheduleRuns.scheduleId))
+    .where(eq(scheduleRuns.threadId, threadId))
+    .limit(1);
+  return row?.toolGroups ?? null;
 }

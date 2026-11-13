@@ -2,6 +2,8 @@ import "server-only";
 import type { UIMessage } from "ai";
 import { contextOf, TURN_CONTEXT_KEY, type TurnContext } from "@/lib/turn-context";
 import { toUIMessage, type StoredMessage } from "@/lib/threads";
+import { decodeToolGroupsReason } from "@/lib/tool-groups";
+import { listScheduleToolGroups } from "@/lib/tools";
 export type { ChatRequest } from "@/lib/chat-request";
 
 export class BadChatRequest extends Error {
@@ -50,6 +52,19 @@ export function applyApprovals(message: UIMessage, answers: ApprovalAnswer[]): U
     const answer = answers.find((a) => a.id === part.approval.id);
     if (!answer) return part;
     applied++;
+    // The add-schedule card can change which tool groups are saved: that choice rides in the
+    // answer's reason and becomes part of the call's input, so exactly what the person saw is saved.
+    const groups = answer.approved && part.type === "tool-add_schedule" ? decodeToolGroupsReason(answer.reason) : undefined;
+    if (groups) {
+      const known = listScheduleToolGroups().map((g) => g.id);
+      const input = { ...(part.input as object), toolGroups: [...new Set(groups.filter((g) => known.includes(g)))] };
+      return {
+        ...part,
+        input,
+        state: "approval-responded" as const,
+        approval: { id: answer.id, approved: true },
+      };
+    }
     return {
       ...part,
       state: "approval-responded" as const,
