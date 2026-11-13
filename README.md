@@ -82,23 +82,28 @@ finishing renders).
 
 The flow, which the model follows on its own from a prompt like "make a 25-second ad for X":
 
-1. The model writes the spoken script and the presenter description.
-2. `list_voices`, then `generate_speech` turns the script into audio (ElevenLabs **Eleven v4**, its best speech model, which supports Hebrew and audio tags like `[excited]`; v4 is
-   served by the text-to-dialogue endpoint, older models by the flows speech endpoint). Scribe is ElevenLabs' speech-to-text model, so
-   it is not used here.
-3. `generate_image` makes the presenter picture (9:16 for Reels/Stories); `list_media` reuses an earlier one so ads look
-   consistent.
-4. `generate_talking_video` sends the presenter + speech to ElevenLabs' lip-sync model (**Creatify Aurora**, 720p) and
-   returns at once; the app finishes the render in the background, stores the MP4 and sends a notification.
+**The presenter is a real person's photo.** Upload one or more clear, front-facing photos (JPEG, PNG or WebP, up to
+15 MB) under **Settings → Media library → Presenter photos**; the newest is the default. The talking-video tool only
+accepts these uploads, so the model can't swap in a generated face (`generate_image` is not offered at all unless
+`ELEVENLABS_ALLOW_GENERATED_PRESENTER=1`). Without an uploaded photo the agent asks you to upload one.
+
+1. The model writes the spoken script.
+2. `list_voices`, then `generate_speech` turns the script into audio (ElevenLabs **Eleven v4**, its best speech
+   model, which supports Hebrew and audio tags like `[excited]`; v4 is served by the text-to-dialogue endpoint, older
+   models by the flows speech endpoint). Scribe is ElevenLabs' speech-to-text model, so it is not used here.
+3. `list_presenters` shows the uploaded photos.
+4. `generate_talking_video` sends the presenter photo + speech to ElevenLabs' lip-sync model (**Creatify Aurora**,
+   720p) and returns at once; the app finishes the render in the background, stores the MP4 and sends a notification.
 5. `generate_scene_video` is the one-step alternative: a Google Veo 3.1 Fast clip (4-8 s) with its own speech and sound
-   from a single prompt. Good for short b-roll; the voice can't be chosen and lip-sync quality is less predictable.
+   from a single prompt, started from the presenter photo when a person appears. Good for short b-roll; the voice
+   can't be chosen and the face is less faithful than with the lip-sync model.
 
 ElevenLabs' separate Avatars product has no API yet, so the two-step flow above is what is available as a single
 pipeline. **Speech and both video tools always ask for approval** (the card shows the script); images run without
 asking. Scheduled runs have nobody to ask (and a parked approval can't be resumed yet), so they only get the
-unapproved tools: a scheduled "ad" prompt writes the script, may make the presenter image, and notifies you. You open
+unapproved tools: a scheduled "ad" prompt writes the script and notifies you. You open
 its conversation (sidebar **Scheduled**), reply "continue", and approve the speech and video cards there. Example
-schedule prompt: "Write a 25-second Hebrew video ad script for <business/offer>, generate a 9:16 presenter image, then
+schedule prompt: "Write a 25-second Hebrew video ad script for <business/offer>, then
 send me a notification and list the media ids and the full script in your reply."
 
 Speech, images and videos show up as players right in the chat (a video still rendering updates itself when done).

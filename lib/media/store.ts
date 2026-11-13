@@ -127,3 +127,12 @@ export async function listGenerating() {
 export async function deleteMedia(id: string) {
   await getDb().delete(media).where(eq(media.id, id));
 }
+
+/** An uploaded photo of the person who presents the ads. */
+export const isPresenter = (m: { kind: string; details: Record<string, unknown> | null }) =>
+  m.kind === "image" && m.details?.presenter === true;
+
+/** Presenter photos, newest first. The first one is the default. */
+export async function listPresenters() {
+  return (await listMedia({ kind: "image", limit: 200 })).filter(isPresenter);
+}

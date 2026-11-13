@@ -2,13 +2,15 @@ import "server-only";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import { t } from "@/lib/i18n";
-import { getMedia, listMedia, mediaUrl, saveMedia, startMedia } from "@/lib/media/store";
+import { getMedia, isPresenter, listMedia, listPresenters, mediaUrl, saveMedia, startMedia } from "@/lib/media/store";
 import { generateAndWait, isElevenLabsConfigured, searchVoices, startGeneration, synthesizeDialogue } from "./client";
 
 /**
  * Tools for making video ads with ElevenLabs. The pipeline the model follows:
- *   write the spoken script -> generate_speech (asks first) -> generate_image (the presenter) ->
- *   generate_talking_video (presenter + speech -> lip-synced video, asks first).
+ *   write the spoken script -> generate_speech (asks first) -> generate_talking_video (the presenter's
+ *   uploaded photo + speech -> lip-synced video, asks first).
+ * The presenter is always a real person's uploaded photo (Settings > Media library); the tools never
+ * invent a face unless ELEVENLABS_ALLOW_GENERATED_PRESENTER=1.
  * `generate_scene_video` is the one-step alternative (a Veo clip with its own speech and sound).
  * Everything is stored in the media library (Settings > Media) and referred to by id.
  */
@@ -38,6 +40,24 @@ async function requireMedia(id: string, kind: "audio" | "image") {
   if (!row) throw new Error(t.mediaLibrary.errNotFound(id));
   if (row.kind !== kind) throw new Error(t.mediaLibrary.errWrongKind(id, kind, row.kind));
   if (row.status !== "ready" || !row.data) throw new Error(t.mediaLibrary.errNotReady(id));
+  return row;
+}
+
+const allowGeneratedPresenter = () => process.env.ELEVENLABS_ALLOW_GENERATED_PRESENTER === "1";
+
+/**
+ * The face for a video: an uploaded presenter photo, the default one when none is named. Any other
+ * image (a generated face, a random file) is refused, so the model can't swap in someone else.
+ */
+async function resolvePresenter(id?: string) {
+  if (id === undefined) {
+    const [first] = await listPresenters();
+    if (!first) throw new Error(t.mediaLibrary.errNoPresenter);
+    id = first.id;
+  }
+  const row = await requireMedia(id, "image");
+  if (!isPresenter(row) || (row.details?.generated === true && !allowGeneratedPresenter()))
+    throw new Error(t.mediaLibrary.errNotPresenter(id));
   return row;
 }
 
@@ -96,9 +116,9 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
 
   const generateImage = tool({
     description:
-      "Generate an image with ElevenLabs and save it to the media library: use it for the presenter (the face that will speak) " +
-      "of a talking video. The presenter should face the camera, be clearly visible from the waist up, with a closed or relaxed mouth and a simple background. " +
-      "For Meta Reels/Stories use aspectRatio 9:16; for the feed use 1:1 or 4:5. Reuse an earlier presenter with list_media instead of making a new one when the ads should look consistent.",
+      "Generate a presenter image with ElevenLabs and save it to the media library. Only available because generated presenters were enabled. " +
+      "The presenter should face the camera, be clearly visible from the waist up, with a closed or relaxed mouth and a simple background. " +
+      "For Meta Reels/Stories use aspectRatio 9:16; for the feed use 1:1 or 4:5.",
     inputSchema: z.object({
       prompt: z.string().min(1).max(2000).describe("What the image shows, in English."),
       aspectRatio: z.enum(["9:16", "1:1", "4:5", "16:9"]).default("9:16"),
@@ -113,7 +133,7 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
         prompt,
         mimeType,
         data,
-        details: { model, aspectRatio },
+        details: { model, aspectRatio, presenter: true, generated: true },
         threadId: ctx.threadId,
       });
       return ref({ id, kind: "image", title });
@@ -137,21 +157,37 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
       })),
   });
 
+  const listPresentersTool = tool({
+    description:
+      "List the presenter photos: real photos of the person who presents the ads, uploaded by the family in Settings > Media library. " +
+      "A talking video always uses one of these. The first is the default. If there are none, tell the person to upload one there; do not try to work around it.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const presenters = await listPresenters();
+      if (presenters.length === 0) return { presenters: [], note: t.mediaLibrary.noPresenterNote };
+      return {
+        presenters: presenters.map((m, i) => ({ ...ref(m), default: i === 0 })),
+      };
+    },
+  });
+
   const generateTalkingVideo = tool({
     description:
-      "Make a lip-synced talking video: the presenter image comes alive and speaks the generated audio (ElevenLabs, Creatify Aurora). " +
+      "Make a lip-synced talking video: the presenter's uploaded photo (see list_presenters) comes alive and speaks the generated audio (ElevenLabs, Creatify Aurora). " +
       "Costs real money and takes a few minutes, so a person must approve it first; call it once, only after the speech and image exist, and do not retry if it is declined. " +
       "It returns immediately with a mediaId and status 'generating'; the person is notified when the video is ready, and it appears in Settings > Media. " +
       "The video's shape follows the image's aspect ratio and its length follows the audio.",
     inputSchema: z.object({
       audioMediaId: z.string().min(1).describe("mediaId of the speech from generate_speech."),
-      imageMediaId: z.string().min(1).describe("mediaId of the presenter image."),
+      imageMediaId: z.string().min(1).optional().describe("mediaId of a presenter photo from list_presenters. Omit to use the default presenter."),
       title: z.string().min(1).max(120).describe("Name of the video, written in Hebrew."),
       script: z.string().min(1).max(2000).describe("The spoken words, copied from the speech. Shown to the person who approves."),
       resolution: z.enum(["480p", "720p"]).default("720p"),
     }),
-    execute: async ({ audioMediaId, imageMediaId, title, script, resolution }) => {
-      const [audio, image] = await Promise.all([requireMedia(audioMediaId, "audio"), requireMedia(imageMediaId, "image")]);
+    execute: async ({ audioMediaId, imageMediaId: requestedImage, title, script, resolution }) => {
+      const image = await resolvePresenter(requestedImage);
+      const audio = await requireMedia(audioMediaId, "audio");
+      const imageMediaId = image.id;
       const externalId = await startGeneration("video", {
         model_id: LIPSYNC_MODEL,
         audio: { type: "inline_base64", content_base64: base64(audio.data!), mime_type: audio.mimeType === "audio/wav" ? "audio/wav" : "audio/mpeg" },
@@ -174,17 +210,20 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
     description:
       "One-step alternative to the talking-video pipeline: generate a short video clip with sound from a single prompt (Google Veo 3.1, via ElevenLabs). " +
       "Put any spoken line in quotes inside the prompt and the model speaks it; the voice cannot be chosen and lip-sync/Hebrew quality is less predictable than generate_talking_video. " +
+      "If a person appears it must be the presenter: pass presenterMediaId (from list_presenters) and do not describe another person; the presenter's photo is the first frame. Never invent a face. " +
       "Clips are 4, 6 or 8 seconds. Costs real money, so a person must approve it first; call it once and do not retry if it is declined. " +
       "Returns a mediaId with status 'generating'; the person is notified when it is ready.",
     inputSchema: z.object({
       prompt: z.string().min(1).max(2000).describe("Scene, camera, mood and the quoted spoken line, in English."),
       title: z.string().min(1).max(120).describe("Name of the video, written in Hebrew."),
+      presenterMediaId: z.string().min(1).optional().describe("Presenter photo to start the clip from; required when a person appears."),
       aspectRatio: z.enum(["9:16", "16:9"]).default("9:16"),
       durationSecs: z.union([z.literal(4), z.literal(6), z.literal(8)]).default(8),
       resolution: z.enum(["720p", "1080p"]).default("720p"),
     }),
-    execute: async ({ prompt, title, aspectRatio, durationSecs, resolution }) => {
+    execute: async ({ prompt, title, presenterMediaId, aspectRatio, durationSecs, resolution }) => {
       const model = SCENE_MODEL();
+      const presenter = presenterMediaId ? await resolvePresenter(presenterMediaId) : undefined;
       const externalId = await startGeneration("video", {
         model_id: model,
         prompt,
@@ -192,13 +231,16 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
         duration_secs: durationSecs,
         resolution,
         generate_audio: true,
+        ...(presenter
+          ? { start_frame: { type: "inline_base64", content_base64: base64(presenter.data!), mime_type: presenter.mimeType ?? "image/jpeg" } }
+          : {}),
       });
       const id = await startMedia({
         kind: "video",
         title,
         prompt,
         externalId,
-        details: { flow: "video", model, aspectRatio, durationSecs, resolution },
+        details: { flow: "video", model, aspectRatio, durationSecs, resolution, presenterMediaId: presenterMediaId ?? null },
         threadId: ctx.threadId,
       });
       return { ...ref({ id, kind: "video", title, status: "generating" }), note: t.mediaLibrary.renderingNote };
@@ -212,7 +254,11 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
     // image, then notifies; speech and video are made once a person continues in the conversation
     // that run saved.
     generate_speech: { tool: generateSpeech, requiresApproval: true, availableInScheduledRuns: false },
-    generate_image: { tool: generateImage, requiresApproval: false, availableInScheduledRuns: true },
+    list_presenters: { tool: listPresentersTool, requiresApproval: false, availableInScheduledRuns: true },
+    // Off unless generated presenters are explicitly allowed: the face must be the real person's.
+    ...(allowGeneratedPresenter()
+      ? { generate_image: { tool: generateImage, requiresApproval: false, availableInScheduledRuns: true } }
+      : {}),
     list_media: { tool: listMediaTool, requiresApproval: false, availableInScheduledRuns: true },
     generate_talking_video: { tool: generateTalkingVideo, requiresApproval: true, availableInScheduledRuns: false },
     generate_scene_video: { tool: generateSceneVideo, requiresApproval: true, availableInScheduledRuns: false },
