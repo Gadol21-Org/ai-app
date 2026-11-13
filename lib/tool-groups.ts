@@ -17,7 +17,7 @@ export type ToolGroupInfo = {
 /** The groups for the app's own tools, and the MCP servers that ship with it. */
 export const KNOWN_GROUPS: Record<string, Omit<ToolGroupInfo, "id">> = {
   notifications: {
-    label: "משפחה והתראות",
+    label: "התראות",
     description:
       "list_users (who the family members are) and send_notification (push notification and inbox message to everyone or one person). " +
       "A scheduled run has nobody watching, so enable this whenever the task should report a result or alert someone.",
