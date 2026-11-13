@@ -73,6 +73,32 @@ tapping Allow/Deny on an approval card, that counts as Deny.
   `getNotifier().notifyPendingApproval()` is called (`lib/approvals/notifier.ts`, a no-op today).
   Implement `Notifier` and call `setNotifier()` at startup to add push.
 
+## Meta ads
+
+Set `META_ADS_ACCESS_TOKEN` and `META_AD_ACCOUNT_ID` and the agent can analyze ad performance and create or change ads.
+Without them none of this exists. The code is in [`lib/mcp.ts`](lib/mcp.ts) (the MCP connection) and
+[`lib/meta/`](lib/meta) (video upload).
+
+- **Meta's official Ads MCP server** (`https://mcp.facebook.com/ads`, open beta since April 2026) is connected like any
+  other MCP server, with the token as a Bearer header. It reads insights (performance trends, benchmarks, anomalies),
+  lists accounts, pages, campaigns, ad sets and ads, and creates / updates / activates them. Reads (`ads_get_*`,
+  `ads_insights_*`, `ads_catalog_get_*`) run without asking; `ads_create_*`, `ads_update_entity` and
+  `ads_activate_entity` always show an approval card. Meta creates new campaigns, ad sets and ads **paused**.
+- **`upload_ad_video` and `create_video_ad`** (both ask first) cover what the MCP server can't: it only takes
+  creatives as public URLs, so these upload a video from the media library to the ad account and build a video ad
+  from it in an existing ad set. The ad is always created `PAUSED`; turning it on is a separate approved call.
+- Typical flow: the model reads performance, writes a script informed by what worked, makes the video with the
+  ElevenLabs tools, then `upload_ad_video`, `create_video_ad`, and (after you review it in Ads Manager)
+  `ads_activate_entity`.
+- Scheduled runs don't get MCP or Meta tools (they can't ask for approval yet).
+
+**Setup (Meta side).** In [Meta Business Settings](https://business.facebook.com/settings) create a **system user**
+(Employee role; the MCP server only accepts those), assign it the ad account (and the Page the ads run as), and
+generate a token for a Meta app with `ads_management`, `ads_read` and `ads_mcp_management`. If the app only manages
+your own business, Standard Access is enough; managing other businesses' accounts needs App Review for Advanced
+Access. `META_AD_ACCOUNT_ID` is the number in Ads Manager (with or without `act_`). The ad account must have the Ads
+MCP rolled out by Meta (a staged beta); if the server returns empty results, that is the usual reason.
+
 ## Video ads (ElevenLabs)
 
 Set `ELEVENLABS_API_KEY` (see `.env.example` for the permissions it needs) and the agent gets tools to make

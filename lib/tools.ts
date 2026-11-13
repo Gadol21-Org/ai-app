@@ -7,6 +7,7 @@ import { getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
 import { listUsers } from "@/lib/users";
 import { displayName } from "@/lib/auth";
 import { makeAdTools } from "@/lib/elevenlabs/tools";
+import { makeMetaAdTools } from "@/lib/meta/tools";
 import { sendNotification } from "@/lib/notifications/service";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
@@ -18,7 +19,7 @@ import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/
 /** What a tool may need to know about the conversation it runs in. */
 type ToolContext = { threadId?: string; focusToolCall?: boolean };
 
-type AgentTool = {
+export type AgentTool = {
   tool: ToolSet[string];
   /** The call is shown to the person, and only runs after they allow it. */
   requiresApproval: boolean;
@@ -178,6 +179,8 @@ function buildRegistry(ctx: ToolContext): Record<string, AgentTool> {
     delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
     // ElevenLabs ad tools; empty unless ELEVENLABS_API_KEY is set.
     ...makeAdTools(ctx),
+    // Meta ad-account tools that complement the Meta Ads MCP; empty unless the token and account are set.
+    ...makeMetaAdTools(),
   };
 }
 

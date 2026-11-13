@@ -74,6 +74,22 @@ function wanderlogServer(): McpServerConfig | undefined {
   };
 }
 
+/**
+ * Meta's official Ads MCP server (beta, Streamable HTTP): insights and benchmarks, plus creating and
+ * changing campaigns, ad sets and ads (new ones are created PAUSED). It authenticates with a user or
+ * system user access token sent as a Bearer header (scopes `ads_mcp_management` + `ads_management`).
+ */
+function metaAdsServer(): McpServerConfig | undefined {
+  const token = process.env.META_ADS_ACCESS_TOKEN?.trim();
+  if (!token) return undefined;
+  return {
+    url: process.env.META_ADS_MCP_URL?.trim() || "https://mcp.facebook.com/ads",
+    headers: { Authorization: `Bearer ${token}` },
+    // Reading ad data runs without asking; every create, update and activate call still asks.
+    allowTools: ["ads_get_*", "ads_insights_*", "ads_catalog_get_*"],
+  };
+}
+
 function parseExtraServers(): Record<string, McpServerConfig> {
   const raw = process.env.MCP_SERVERS?.trim();
   if (!raw) return {};
@@ -89,6 +105,7 @@ function parseExtraServers(): Record<string, McpServerConfig> {
 export function getMcpServers(): Record<string, McpServerConfig> {
   const servers: Record<string, McpServerConfig | undefined> = {
     wanderlog: wanderlogServer(),
+    meta_ads: metaAdsServer(),
     ...parseExtraServers(),
   };
   return Object.fromEntries(
