@@ -80,7 +80,11 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
     description:
       "Turn a script into spoken audio with ElevenLabs text to speech and save it to the media library. " +
       "Costs credits, so a person must approve it first (the script is shown to them); do not retry if it is declined. Returns a mediaId to pass to generate_talking_video. Write only what is spoken: no stage directions, no emojis. " +
-      "With the default model (Eleven v4) short audio tags such as [excited] or [whispers] steer the delivery. " +
+      "Eleven v4 (the default) reads audio tags in square brackets as delivery directions, spoken-word tags only, written in English even inside Hebrew text: " +
+      "[excited], [curious], [whispers], [sighs], [exhales], [laughs], [laughs harder], [starts laughing], [sarcastic], [mischievously]. " +
+      "Use them sparingly, one to three in a 15-30 second ad, placed right before the phrase they colour (for example an [excited] opener, a [laughs] or [sighs] after a relatable joke or pain point, a [whispers] before a secret offer), and match them to the brand's tone: a warm family business wants warmth and a smile, not drama. " +
+      "Do not use sound-effect tags (applause, gunshot, explosion), SSML such as <break>, or invented tags: they may be spoken or turned into noise. " +
+      "For pauses use an ellipsis (...) or a dash; CAPITALS add emphasis. " +
       "Keep ads short: 15-30 seconds is about 40-90 Hebrew words.",
     inputSchema: z.object({
       script: z.string().min(1).max(2000).describe("The exact words to speak, in the language of the ad."),
