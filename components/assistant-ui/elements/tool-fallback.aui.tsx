@@ -40,6 +40,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { t, toolDisplayName } from "@/lib/i18n";
+import { MediaPreview, type MediaPreviewProps } from "@/components/media-preview";
 
 const ANIMATION_DURATION = 200;
 
@@ -1285,7 +1286,11 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
     }
   }, [approval, isRequiresAction, status?.type]);
 
+  // A file the tool made (speech, image, video) is shown under the card, even while it is collapsed.
+  const media = toolName.startsWith("generate_") ? mediaOf(result) : undefined;
+
   return (
+    <>
     <ToolFallbackRoot open={open} onOpenChange={setOpen}>
       <ToolFallbackTrigger
         toolName={toolName}
@@ -1333,8 +1338,19 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
         <ToolFallbackResult result={result} />
       </ToolFallbackContent>
     </ToolFallbackRoot>
+    {media && <MediaPreview {...media} className="ps-6 pb-2" />}
+    </>
   );
 };
+
+/** The media tools return {mediaId, kind, status, title}; that is what the preview needs. */
+function mediaOf(result: unknown): Pick<MediaPreviewProps, "id" | "kind" | "status" | "title"> | undefined {
+  const r = result as Record<string, unknown> | null | undefined;
+  if (!r || typeof r !== "object" || typeof r.mediaId !== "string") return undefined;
+  if (r.kind !== "audio" && r.kind !== "image" && r.kind !== "video") return undefined;
+  const status = r.status === "generating" || r.status === "failed" ? r.status : "ready";
+  return { id: r.mediaId, kind: r.kind, status, title: typeof r.title === "string" ? r.title : "" };
+}
 
 const ToolFallback = memo(
   ToolFallbackImpl,

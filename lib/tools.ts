@@ -6,6 +6,7 @@ import { t } from "@/lib/i18n";
 import { getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
 import { listUsers } from "@/lib/users";
 import { displayName } from "@/lib/auth";
+import { makeAdTools } from "@/lib/elevenlabs/tools";
 import { sendNotification } from "@/lib/notifications/service";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
@@ -167,22 +168,24 @@ function makeSendNotificationTool(ctx: ToolContext) {
   });
 }
 
-const registry: Record<string, AgentTool> = {
-  add_schedule: { tool: addSchedule, requiresApproval: true, availableInScheduledRuns: false },
-  list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
-  list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },
-  send_notification: { tool: makeSendNotificationTool({}), requiresApproval: false, availableInScheduledRuns: true },
-  delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
-};
+/** Built per request, because some tools (notifications, media) record which conversation they ran in. */
+function buildRegistry(ctx: ToolContext): Record<string, AgentTool> {
+  return {
+    add_schedule: { tool: addSchedule, requiresApproval: true, availableInScheduledRuns: false },
+    list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
+    list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },
+    send_notification: { tool: makeSendNotificationTool(ctx), requiresApproval: false, availableInScheduledRuns: true },
+    delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
+    // ElevenLabs ad tools; empty unless ELEVENLABS_API_KEY is set.
+    ...makeAdTools(ctx),
+  };
+}
 
 function pick(filter: (t: AgentTool) => boolean, ctx: ToolContext): ToolSet {
   return Object.fromEntries(
-    Object.entries(registry)
+    Object.entries(buildRegistry(ctx))
       .filter(([, t]) => filter(t))
-      .map(([name, entry]) => [
-        name,
-        name === "send_notification" ? makeSendNotificationTool(ctx) : entry.tool,
-      ]),
+      .map(([name, entry]) => [name, entry.tool]),
   );
 }
 
@@ -202,10 +205,12 @@ export function getScheduledRunTools(threadId?: string): ToolSet {
  * chose to allow for the rest of this conversation; built-in tools always keep their own rule.
  */
 export function getToolApproval(tools: ToolSet, allowedInConversation: readonly string[] = []) {
+  const registry = buildRegistry({});
   return Object.fromEntries(
     Object.keys(tools).map((name) => {
-      const asks = registry[name]
-        ? registry[name].requiresApproval
+      const builtIn = registry[name];
+      const asks = builtIn
+        ? builtIn.requiresApproval
         : mcpToolRequiresApproval(name) && !allowedInConversation.includes(name);
       return [name, asks ? ("user-approval" as const) : ("not-applicable" as const)];
     }),

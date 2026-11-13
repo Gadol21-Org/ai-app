@@ -84,11 +84,18 @@ const DefaultToolGroup: FC<PropsWithChildren<{ group: ThreadGroupPart }>> = ({
   children,
 }) => {
   const [open, setOpen] = useState(false);
+  // Calls that make a file (speech, image, video) stay open so their player is visible.
+  const makesMedia = useAuiState((s) =>
+    group.indices.some((i) => {
+      const part = s.message.parts[i];
+      return part?.type === "tool-call" && part.toolName.startsWith("generate_");
+    }),
+  );
 
   return (
     <ToolGroupRoot
       variant="ghost"
-      open={open || group.counts.requiresAction > 0}
+      open={open || makesMedia || group.counts.requiresAction > 0}
       onOpenChange={setOpen}
     >
       <ToolGroupTrigger
