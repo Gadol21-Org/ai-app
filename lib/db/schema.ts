@@ -90,6 +90,11 @@ export const schedules = mysqlTable(
     /** IANA zone the cron expression is evaluated in. */
     timezone: varchar("timezone", { length: 64 }).notNull(),
     enabled: boolean("enabled").notNull().default(true),
+    /**
+     * Ids of the tool groups a run may use (see lib/tool-groups.ts). Null on schedules made before
+     * groups existed, which keep every group.
+     */
+    toolGroups: json("tool_groups").$type<string[]>(),
     /** When the scheduler will fire it next. Null once a one-off has run or the schedule is paused. */
     nextRunAt: timestamp("next_run_at", { fsp: 3 }),
     lastRunAt: timestamp("last_run_at", { fsp: 3 }),

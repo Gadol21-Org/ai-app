@@ -50,6 +50,13 @@
       "when": 1794537496976,
       "tag": "0006_approvals_by_thread",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1794575669067,
+      "tag": "0007_schedule_tool_groups",
+      "breakpoints": true
     }
   ]
 }

@@ -6,10 +6,25 @@ import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { PresentTool } from "@/components/assistant-ui/elements/present-tool.aui";
 import { RenderChartTool } from "@/components/assistant-ui/elements/chart-tool.aui";
 import { ToolFallback } from "@/components/assistant-ui/elements/tool-fallback.aui";
+import { ToolGroupPicker } from "@/components/tool-group-picker";
 import { describeTiming } from "@/lib/schedules/timing";
+import { encodeToolGroupsReason, type ToolGroupInfo } from "@/lib/tool-groups";
 import { t } from "@/lib/i18n";
 
-type Args = { title?: string; prompt?: string; runAt?: string; cron?: string };
+type Args = { title?: string; prompt?: string; toolGroups?: string[]; runAt?: string; cron?: string };
+
+/** The groups a schedule can enable, fetched once for every card on the page. */
+let groupsRequest: Promise<ToolGroupInfo[]> | undefined;
+function useToolGroups() {
+  const [groups, setGroups] = useState<ToolGroupInfo[]>([]);
+  useEffect(() => {
+    groupsRequest ??= fetch("/api/tool-groups").then((r) => (r.ok ? r.json() : []));
+    groupsRequest.then(setGroups, () => {
+      groupsRequest = undefined;
+    });
+  }, []);
+  return groups;
+}
 
 /** The zone schedules run in (set on the server), so the card shows the same times Settings will. */
 export const ScheduleTimezoneContext = createContext("UTC");
@@ -28,6 +43,12 @@ export const AddScheduleTool: ToolCallMessagePartComponent = (props) => {
       ? describeTiming({ kind: "once", runAt: a.runAt }, tz)
       : null;
   const failed = status?.type === "incomplete" && status.reason !== "cancelled";
+  const groups = useToolGroups();
+  // The person's changes to what the model chose; null until they touch a checkbox.
+  const [override, setOverride] = useState<string[] | null>(null);
+  const saved = (result as { toolGroups?: string[] } | undefined)?.toolGroups;
+  const settled = result !== undefined || (approval != null && approval.approved !== undefined);
+  const chosen = saved ?? override ?? a.toolGroups ?? [];
 
   return (
     <div
@@ -55,9 +76,20 @@ export const AddScheduleTool: ToolCallMessagePartComponent = (props) => {
             {a.prompt ?? "…"}
           </dd>
         </div>
+        <div>
+          <dt className="text-muted-foreground text-xs">{t.schedule.groupsLabel}</dt>
+          <dd>
+            {a.toolGroups === undefined ? (
+              "…"
+            ) : (
+              <ToolGroupPicker groups={groups} value={chosen} onChange={setOverride} disabled={settled} />
+            )}
+          </dd>
+        </div>
       </dl>
       {(approval != null || status?.type === "requires-action") && (
         <ToolFallback.Approval
+          approveReason={override ? encodeToolGroupsReason(override) : undefined}
           approval={approval}
           respondToApproval={respondToApproval}
           addResult={addResult}

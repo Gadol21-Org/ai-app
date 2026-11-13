@@ -36,7 +36,12 @@ import { t } from "@/lib/i18n";
 export type McpServerConfig = (
   | { url: string; headers?: Record<string, string> }
   | { command: string; args?: string[]; env?: Record<string, string> }
-) & { requireApproval?: "all" | "none" | string[]; allowTools?: string[] };
+) & {
+  requireApproval?: "all" | "none" | string[];
+  allowTools?: string[];
+  /** What the server is for, shown to the model when it picks tool groups for a scheduled prompt. */
+  description?: string;
+};
 
 /** Tool results longer than this are cut before they reach the chat, the DB or the model. */
 export const MAX_TOOL_RESULT_CHARS =
@@ -250,9 +255,9 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
   return pending;
 }
 
-/** Tools from every configured MCP server, or `{}` when none are configured or reachable. */
-export async function getMcpTools(): Promise<ToolSet> {
-  const entries = Object.entries(getMcpServers());
+/** Tools of each configured MCP server (its own tool group), keyed by server name. An unreachable server is left out. */
+export async function getMcpToolGroups(only?: readonly string[] | null): Promise<Record<string, ToolSet>> {
+  const entries = Object.entries(getMcpServers()).filter(([name]) => !only || only.includes(name));
   const results = await Promise.all(
     entries.map(async ([name, config]) => {
       try {
@@ -266,13 +271,17 @@ export async function getMcpTools(): Promise<ToolSet> {
       }
     }),
   );
+  return Object.fromEntries(entries.map(([name], index) => [name, results[index]]));
+}
+
+/** Tools from the configured MCP servers (all of them, or just the named ones), or `{}` when none are reachable. */
+export async function getMcpTools(only?: readonly string[] | null): Promise<ToolSet> {
+  const groups = await getMcpToolGroups(only);
   const tools: ToolSet = {};
-  for (const [index, serverTools] of results.entries()) {
+  for (const [server, serverTools] of Object.entries(groups)) {
     for (const [toolName, tool] of Object.entries(serverTools)) {
       if (toolName in tools) {
-        console.warn(
-          `[mcp] duplicate tool "${toolName}" from ${entries[index][0]} ignored`,
-        );
+        console.warn(`[mcp] duplicate tool "${toolName}" from ${server} ignored`);
         continue;
       }
       tools[toolName] = tool;

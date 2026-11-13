@@ -5,10 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { t } from "@/lib/i18n";
+import type { ToolGroupInfo } from "@/lib/tool-groups";
 import { formatDateTime } from "@/lib/format";
 import { listRecentRuns, listSchedules, type Schedule, type ScheduleRun } from "@/lib/schedules/store";
 import { describeTiming } from "@/lib/schedules/timing";
+import { listScheduleToolGroups } from "@/lib/tools";
+import { enabledToolGroups } from "@/lib/schedules/store";
 import { ScheduleActions } from "./schedule-actions";
+import { ScheduleToolGroups } from "./schedule-tool-groups";
 
 export const metadata: Metadata = { title: `${t.schedule.pageTitle} · ${t.appName}` };
 export const dynamic = "force-dynamic";
@@ -21,7 +25,7 @@ function StatusBadge({ s }: { s: Schedule }) {
   return <Badge variant="secondary">{t.schedule.active}</Badge>;
 }
 
-function ScheduleCard({ s, lastRun }: { s: Schedule; lastRun?: ScheduleRun }) {
+function ScheduleCard({ s, lastRun, groups }: { s: Schedule; lastRun?: ScheduleRun; groups: ToolGroupInfo[] }) {
   const finished = s.kind === "once" && s.nextRunAt === null && s.lastRunAt !== null;
   const when = (d: Date | null) => (d ? formatDateTime(d, s.timezone) : "–");
   return (
@@ -46,6 +50,8 @@ function ScheduleCard({ s, lastRun }: { s: Schedule; lastRun?: ScheduleRun }) {
         </div>
 
         <p className="bg-muted/50 line-clamp-3 rounded-md p-2.5 text-sm whitespace-pre-wrap">{s.prompt}</p>
+
+        <ScheduleToolGroups id={s.id} groups={groups} initial={enabledToolGroups(s)} legacy={s.toolGroups === null} />
 
         <dl className="text-muted-foreground grid grid-cols-2 gap-x-4 text-sm sm:max-w-sm">
           <div>
@@ -79,6 +85,7 @@ function ScheduleCard({ s, lastRun }: { s: Schedule; lastRun?: ScheduleRun }) {
 
 export default async function SchedulesPage() {
   const [schedules, runs] = await Promise.all([listSchedules(), listRecentRuns()]);
+  const groups = listScheduleToolGroups();
   const lastRunBySchedule = new Map<string, ScheduleRun>();
   for (const r of runs) if (!lastRunBySchedule.has(r.scheduleId) && r.status !== "running") lastRunBySchedule.set(r.scheduleId, r);
 
@@ -101,7 +108,7 @@ export default async function SchedulesPage() {
             {t.schedule.empty}
           </div>
         ) : (
-          schedules.map((s) => <ScheduleCard key={s.id} s={s} lastRun={lastRunBySchedule.get(s.id)} />)
+          schedules.map((s) => <ScheduleCard key={s.id} s={s} lastRun={lastRunBySchedule.get(s.id)} groups={groups} />)
         )}
       </main>
     </div>

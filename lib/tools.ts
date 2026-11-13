@@ -5,7 +5,8 @@ import { schemaOnlyVocabulary } from "@/lib/generative-ui-vocabulary";
 import { z } from "zod";
 import { createSchedule, deleteSchedule, getSchedule, listSchedules } from "@/lib/schedules/store";
 import { t } from "@/lib/i18n";
-import { getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
+import { getMcpServers, getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
+import { describeGroup, type ToolGroupInfo } from "@/lib/tool-groups";
 import { listUsers } from "@/lib/users";
 import { displayName } from "@/lib/auth";
 import { makeAdTools } from "@/lib/elevenlabs/tools";
@@ -29,63 +30,95 @@ export type AgentTool = {
   requiresApproval: boolean;
   /** Scheduled runs get this tool too. */
   availableInScheduledRuns: boolean;
+  /** The tool group it belongs to (see lib/tool-groups.ts); a schedule enables its tools by group. */
+  group: string;
 };
 
-const addSchedule = tool({
-  description:
-    "Save a prompt to be run automatically later, once or on a repeating schedule (for example a weekly budget summary). " +
-    "The user sees the title and prompt and must approve before anything is saved. " +
-    "The prompt is run later with no conversation, so make it fully self-contained.",
-  inputSchema: z
-    .object({
-      title: z.string().min(1).max(120).describe("Short name for the schedule, shown in Settings. Write it in Hebrew unless the user used another language."),
-      prompt: z.string().min(1).max(4000).describe("The full instruction to run at each scheduled time."),
-      runAt: z
-        .string()
-        .datetime({ offset: true })
-        .optional()
-        .describe("One-off: when to run, ISO 8601 with UTC offset, e.g. 2026-11-12T08:00:00+02:00. Use this OR cron."),
-      cron: z
-        .string()
-        .min(1)
-        .optional()
-        .describe(
-          "Repeating: 5-field cron expression (minute hour day-of-month month day-of-week) in the app's time zone, e.g. '0 8 * * 1-5' for weekdays at 08:00. Use this OR runAt.",
-        ),
-    })
-    // Checked before the user is asked, so they are never shown a schedule that can't be saved.
-    .superRefine((v, ctx) => {
-      if ((v.runAt === undefined) === (v.cron === undefined)) {
-        ctx.addIssue({ code: "custom", message: t.schedule.errExactlyOne });
-      } else if (v.runAt !== undefined && new Date(v.runAt).getTime() <= Date.now()) {
-        ctx.addIssue({ code: "custom", path: ["runAt"], message: t.schedule.errPast });
-      } else if (v.cron !== undefined) {
-        try {
-          validateCron(v.cron, scheduleTimezone());
-        } catch (error) {
-          ctx.addIssue({ code: "custom", path: ["cron"], message: (error as Error).message });
+type UngroupedTool = Omit<AgentTool, "group">;
+
+/** Puts a set of tools into one group. */
+export function inGroup(group: string, tools: Record<string, UngroupedTool>): Record<string, AgentTool> {
+  return Object.fromEntries(Object.entries(tools).map(([name, entry]) => [name, { ...entry, group }]));
+}
+
+/** The groups a schedule can enable, spelled out for the model: it must pick from them, and only what the task needs. */
+function groupsForModel(groups: ToolGroupInfo[]) {
+  return groups.map((g) => `- ${g.id}: ${g.description}`).join("\n");
+}
+
+function makeAddScheduleTool(groups: ToolGroupInfo[]) {
+  const ids = groups.map((g) => g.id);
+  return tool({
+    description:
+      "Save a prompt to be run automatically later, once or on a repeating schedule (for example a weekly budget summary). " +
+      "The user sees the title, prompt and tool groups and must approve before anything is saved. " +
+      "The prompt is run later with no conversation, so make it fully self-contained. " +
+      "A run can only use the tools of the tool groups you enable here, so enable exactly the groups the task needs and nothing extra " +
+      "(each extra group gives an unattended run more it could do). The groups are:\n" +
+      groupsForModel(groups),
+    inputSchema: z
+      .object({
+        title: z.string().min(1).max(120).describe("Short name for the schedule, shown in Settings. Write it in Hebrew unless the user used another language."),
+        prompt: z.string().min(1).max(4000).describe("The full instruction to run at each scheduled time."),
+        toolGroups: z
+          .array(z.string())
+          .describe(
+            `The tool groups the run may use, chosen from: ${ids.join(", ")}. Enable only the groups the task requires, nothing extra; ` +
+              "an empty list is fine for a task that needs no tools.",
+          ),
+        runAt: z
+          .string()
+          .datetime({ offset: true })
+          .optional()
+          .describe("One-off: when to run, ISO 8601 with UTC offset, e.g. 2026-11-12T08:00:00+02:00. Use this OR cron."),
+        cron: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Repeating: 5-field cron expression (minute hour day-of-month month day-of-week) in the app's time zone, e.g. '0 8 * * 1-5' for weekdays at 08:00. Use this OR runAt.",
+          ),
+      })
+      // Checked before the user is asked, so they are never shown a schedule that can't be saved.
+      .superRefine((v, ctx) => {
+        const unknown = v.toolGroups.filter((g) => !ids.includes(g));
+        if (unknown.length > 0) {
+          ctx.addIssue({ code: "custom", path: ["toolGroups"], message: t.schedule.errUnknownGroups(unknown, ids) });
         }
-      }
-    }),
-  execute: async ({ title, prompt, runAt, cron }) => {
-    const id = await createSchedule(
-      runAt !== undefined
-        ? { kind: "once", title, prompt, runAt: new Date(runAt) }
-        : { kind: "cron", title, prompt, cron: cron! },
-    );
-    const tz = scheduleTimezone();
-    return {
-      id,
-      title,
-      schedule: describeTiming(
+        if ((v.runAt === undefined) === (v.cron === undefined)) {
+          ctx.addIssue({ code: "custom", message: t.schedule.errExactlyOne });
+        } else if (v.runAt !== undefined && new Date(v.runAt).getTime() <= Date.now()) {
+          ctx.addIssue({ code: "custom", path: ["runAt"], message: t.schedule.errPast });
+        } else if (v.cron !== undefined) {
+          try {
+            validateCron(v.cron, scheduleTimezone());
+          } catch (error) {
+            ctx.addIssue({ code: "custom", path: ["cron"], message: (error as Error).message });
+          }
+        }
+      }),
+    execute: async ({ title, prompt, toolGroups, runAt, cron }) => {
+      // The person may have changed the groups on the card; the chat route put their choice into the input.
+      const id = await createSchedule(
         runAt !== undefined
-          ? { kind: "once", runAt: new Date(runAt) }
-          : { kind: "cron", cron: cron!, timezone: tz },
-        tz,
-      ),
-    };
-  },
-});
+          ? { kind: "once", title, prompt, toolGroups, runAt: new Date(runAt) }
+          : { kind: "cron", title, prompt, toolGroups, cron: cron! },
+      );
+      const tz = scheduleTimezone();
+      return {
+        id,
+        title,
+        toolGroups,
+        schedule: describeTiming(
+          runAt !== undefined
+            ? { kind: "once", runAt: new Date(runAt) }
+            : { kind: "cron", cron: cron!, timezone: tz },
+          tz,
+        ),
+      };
+    },
+  });
+}
 
 const listSchedulesTool = tool({
   description:
@@ -97,6 +130,7 @@ const listSchedulesTool = tool({
       id: s.id,
       title: s.title,
       prompt: s.prompt,
+      toolGroups: s.toolGroups ?? "all",
       runs: describeTiming(
         s.kind === "cron"
           ? { kind: "cron", cron: s.cron, timezone: s.timezone }
@@ -195,20 +229,43 @@ const presentTool = tool({
 });
 
 /** Built per request, because some tools (notifications, media) record which conversation they ran in. */
-function buildRegistry(ctx: ToolContext): Record<string, AgentTool> {
+function buildRegistry(ctx: ToolContext, scheduleGroups?: ToolGroupInfo[]): Record<string, AgentTool> {
   return {
-    present: { tool: presentTool, requiresApproval: false, availableInScheduledRuns: false },
-    render_chart: { tool: renderChartTool, requiresApproval: false, availableInScheduledRuns: false },
-    add_schedule: { tool: addSchedule, requiresApproval: true, availableInScheduledRuns: false },
-    list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
-    list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },
-    send_notification: { tool: makeSendNotificationTool(ctx), requiresApproval: false, availableInScheduledRuns: true },
-    delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
+    ...inGroup("charts", {
+      present: { tool: presentTool, requiresApproval: false, availableInScheduledRuns: false },
+      render_chart: { tool: renderChartTool, requiresApproval: false, availableInScheduledRuns: false },
+    }),
+    ...inGroup("schedules", {
+      add_schedule: { tool: makeAddScheduleTool(scheduleGroups ?? listScheduleToolGroups()), requiresApproval: true, availableInScheduledRuns: false },
+      list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
+      delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
+    }),
+    ...inGroup("notifications", {
+      list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },
+      send_notification: { tool: makeSendNotificationTool(ctx), requiresApproval: false, availableInScheduledRuns: true },
+    }),
     // ElevenLabs ad tools; empty unless ELEVENLABS_API_KEY is set.
-    ...makeAdTools(ctx),
-    // Meta ad-account tools that complement the Meta Ads MCP; empty unless the token and account are set.
-    ...makeMetaAdTools(),
+    ...inGroup("elevenlabs", makeAdTools(ctx)),
+    // Meta ad-account tools that complement the Meta Ads MCP (the same group); empty unless the token and account are set.
+    ...inGroup("meta_ads", makeMetaAdTools()),
   };
+}
+
+/**
+ * The groups a scheduled prompt can enable right now: those with at least one tool a scheduled run
+ * may use (a chart needs someone looking at the chat, so "charts" is not offered), and every
+ * configured MCP server. A group whose service is not configured does not exist.
+ */
+export function listScheduleToolGroups(): ToolGroupInfo[] {
+  const groups = new Map<string, ToolGroupInfo>();
+  // The groups are what is being worked out here, so the schedule tool is built without them.
+  for (const entry of Object.values(buildRegistry({}, []))) {
+    if (entry.availableInScheduledRuns && !groups.has(entry.group)) groups.set(entry.group, describeGroup(entry.group));
+  }
+  for (const [name, config] of Object.entries(getMcpServers())) {
+    if (!groups.has(name)) groups.set(name, describeGroup(name, config.description));
+  }
+  return [...groups.values()];
 }
 
 function pick(filter: (t: AgentTool) => boolean, ctx: ToolContext): ToolSet {
@@ -226,12 +283,18 @@ export async function getChatTools(threadId?: string): Promise<ToolSet> {
 }
 
 /**
- * Tools for a scheduled run: the same as a chat's, except no self-scheduling (so a schedule can
- * never spawn more schedules). Tools that need approval are included: the run stops at the card
+ * Tools for a scheduled run: only those of the tool groups it was given (`null`: every group, for
+ * a schedule made before groups existed), and no self-scheduling, so a schedule can never spawn
+ * more schedules. Tools that need approval are included and keep asking: the run stops at the card
  * and waits for someone to answer it in the saved conversation.
  */
-export async function getScheduledRunTools(threadId?: string): Promise<ToolSet> {
-  return { ...(await getMcpTools()), ...pick((t) => t.availableInScheduledRuns, { threadId, focusToolCall: true }) };
+export async function getScheduledRunTools(threadId: string | undefined, groups: readonly string[] | null): Promise<ToolSet> {
+  const enabled = (group: string) => !groups || groups.includes(group);
+  const mcpServers = Object.keys(getMcpServers()).filter(enabled);
+  return {
+    ...(mcpServers.length > 0 ? await getMcpTools(mcpServers) : {}),
+    ...pick((t) => t.availableInScheduledRuns && enabled(t.group), { threadId, focusToolCall: true }),
+  };
 }
 
 /**

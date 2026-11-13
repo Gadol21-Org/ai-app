@@ -66,6 +66,7 @@ tapping Allow/Deny on an approval card, that counts as Deny.
 - Stored in MySQL (`schedules`, `schedule_runs`); a poller checks every 30 s, so schedules survive
   restarts and a firing missed during downtime runs once on startup. Repeats use cron expressions
   ([croner](https://github.com/Hexagon/croner)) in `SCHEDULE_TIMEZONE`.
+- **Tool groups**: every tool belongs to a group (each MCP server is one; the app's own tools are grouped by purpose, e.g. `notifications`, `elevenlabs`, `meta_ads`; see `lib/tool-groups.ts`). A schedule stores which groups it may use and a run only sees those tools. The model picks the groups when it adds a schedule (it is told to enable only what the task needs); the approval card shows them folded as one line, and each can be ticked or unticked before you allow. Settings → Scheduled prompts edits them later. Schedules saved before groups existed keep all groups until edited. Approval-gated tools still ask in every run. Give an `MCP_SERVERS` entry a `"description"` so the model knows what its group is for.
 - Tools live in `lib/tools.ts`, which also says which need approval and which scheduled runs may use.
 - `render_chart` draws line, bar, area, pie and scatter charts from data the model passes in (`lib/chart-spec.ts` is the spec, `components/assistant-ui/elements/chart-tool.aui.tsx` draws it with Recharts).
   Scheduled runs cannot add schedules.
