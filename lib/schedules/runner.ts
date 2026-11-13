@@ -1,6 +1,6 @@
 import "server-only";
-import { generateText, isStepCount } from "ai";
-import { createPendingApproval } from "@/lib/approvals/pending";
+import { generateId, isStepCount, streamText, type UIMessage } from "ai";
+import { approvalCards, expireStaleApprovals, notifyApprovalNeeded, trackApprovals } from "@/lib/approvals/pending";
 import { getChatModel, getChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { getScheduledRunTools, getToolApproval } from "@/lib/tools";
@@ -61,45 +61,48 @@ export async function runSchedule(schedule: Schedule) {
     return startRun(schedule.id, threadId);
   })();
   try {
-    const tools = getScheduledRunTools(threadId);
-    const result = await generateText({
+    const tools = await getScheduledRunTools(threadId);
+    const modelId = getChatModelId();
+    const result = streamText({
       abortSignal: AbortSignal.timeout(RUN_TIMEOUT_MS),
       model: getChatModel(),
       // Constant across runs (cacheable); the run's own details go after the prompt instead.
-      system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching, so do not ask questions. Tool results are not saved with this conversation, so state in your final reply everything the person needs to continue from it: the ids of any media you made (and what each is), the full script, and what you are waiting for them to approve.`,
+      system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching right now, so do not ask questions. A tool that needs a person's approval pauses the task: its card is saved in this conversation and everyone is notified. Do the preparation that needs no approval first, then request the approval-requiring call, and say in your reply what is waiting for approval. When someone answers, the conversation continues from there.`,
       prompt: `${schedule.prompt}\n\n<context>\n${context.note}\n</context>`,
       tools,
       toolApproval: getToolApproval(tools),
       stopWhen: isStepCount(10),
-    });
-    await recordUsage({
-      threadId,
-      kind: "schedule",
-      modelId: getChatModelId(),
-      usage: result.totalUsage,
+      onFinish: ({ totalUsage }) => recordUsage({ threadId, kind: "schedule", modelId, usage: totalUsage }),
     });
 
-    // A tool that needs a person's OK can't run unattended: park it and let the notifier know.
-    const requests = result.content.flatMap((p) =>
-      p.type === "tool-approval-request" && !p.isAutomatic ? [p] : [],
-    );
-    for (const request of requests) {
-      await createPendingApproval({
-        source: "schedule",
-        sourceId: schedule.id,
-        runId,
-        toolName: request.toolCall.toolName,
-        title: schedule.title,
-        input: request.toolCall.input,
-      });
+    // The reply is saved the way a chat turn's is, tool calls and approval cards included, so the
+    // person can open the conversation, answer the cards, and the turn continues from there.
+    let saved: UIMessage | undefined;
+    let streamError: string | undefined;
+    for await (const chunk of result.toUIMessageStream({
+      originalMessages: [],
+      generateMessageId: generateId,
+      onError: (error) => (error instanceof Error ? error.message : String(error)),
+      onEnd: ({ responseMessage }) => {
+        saved = responseMessage;
+      },
+    })) {
+      // A failed tool call is an ordinary part of the reply; only an error of the run itself stops it.
+      if (chunk.type === "error") streamError = chunk.errorText;
     }
-    await reply(
-      result.text ||
-        (requests.length > 0 ? t.schedule.runNeedsApproval : t.schedule.runNoReply),
-    );
+    if (streamError) throw new Error(streamError);
+    if (!saved || !saved.parts.some((p) => p.type !== "step-start"))
+      saved = { id: generateId(), role: "assistant", parts: [{ type: "text", text: t.schedule.runNoReply }] };
+    await saveUIMessage(threadId, saved, userMessageId);
+
+    // A tool that needs a person's OK: end the run cleanly here. The card waits in the saved
+    // conversation; everyone is told, and the first person to answer it resumes the work.
+    const cards = await trackApprovals(saved, { threadId, scheduleId: schedule.id, runId });
+    await notifyApprovalNeeded({ threadId, title: schedule.title, cards });
+    const waiting = approvalCards(saved).some((c) => c.state === "approval-requested");
     await finishRun(runId, schedule.id, {
-      status: requests.length > 0 ? "awaiting_approval" : "success",
-      output: result.text,
+      status: waiting ? "awaiting_approval" : "success",
+      output: saved.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n"),
     });
   } catch (error) {
     console.error(`scheduled run "${schedule.title}" failed`, error);
@@ -136,6 +139,7 @@ export async function startScheduler() {
     globalForScheduler.__ticking = true;
     try {
       await runDueSchedules();
+      await expireStaleApprovals();
     } catch (error) {
       console.error("scheduler tick failed", error);
     } finally {

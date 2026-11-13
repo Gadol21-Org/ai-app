@@ -68,10 +68,13 @@ tapping Allow/Deny on an approval card, that counts as Deny.
   ([croner](https://github.com/Hexagon/croner)) in `SCHEDULE_TIMEZONE`.
 - Tools live in `lib/tools.ts`, which also says which need approval and which scheduled runs may use.
   Scheduled runs cannot add schedules.
-- Push notifications are not built. A scheduled run that reaches a tool needing approval is parked
-  as a `pending_approvals` row, the run is marked "awaiting approval", and
-  `getNotifier().notifyPendingApproval()` is called (`lib/approvals/notifier.ts`, a no-op today).
-  Implement `Notifier` and call `setNotifier()` at startup to add push.
+- **Approvals in scheduled runs.** A scheduled run gets the same tools as a chat (except self-scheduling). When it
+  reaches a tool that needs approval it stops cleanly: the conversation is saved with the approval card, the run is
+  marked "awaiting approval", and every user gets an in-app notification (plus a push, when VAPID keys are set)
+  that opens the conversation at the card. Whoever answers first continues the run in that conversation (the chat
+  route continues the saved assistant message); a second answer to the same card gets a "someone already answered"
+  error. Cards nobody answers expire after `APPROVAL_TTL_HOURS` (default 72) and show as denied. Rows live in
+  `pending_approvals` (`lib/approvals/pending.ts`).
 
 ## Meta ads
 
@@ -90,7 +93,7 @@ Without them none of this exists. The code is in [`lib/mcp.ts`](lib/mcp.ts) (the
 - Typical flow: the model reads performance, writes a script informed by what worked, makes the video with the
   ElevenLabs tools, then `upload_ad_video`, `create_video_ad`, and (after you review it in Ads Manager)
   `ads_activate_entity`.
-- Scheduled runs don't get MCP or Meta tools (they can't ask for approval yet).
+- Scheduled runs get these tools too; the create/update/activate calls wait for approval as described under Scheduled prompts.
 
 **Setup (Meta side).** In [Meta Business Settings](https://business.facebook.com/settings) create a **system user**
 (Employee role; the MCP server only accepts those), assign it the ad account (and the Page the ads run as), and
@@ -126,9 +129,8 @@ accepts these uploads, so the model can't swap in a generated face (`generate_im
 
 ElevenLabs' separate Avatars product has no API yet, so the two-step flow above is what is available as a single
 pipeline. **Speech and both video tools always ask for approval** (the card shows the script); images run without
-asking. Scheduled runs have nobody to ask (and a parked approval can't be resumed yet), so they only get the
-unapproved tools: a scheduled "ad" prompt writes the script and notifies you. You open
-its conversation (sidebar **Scheduled**), reply "continue", and approve the speech and video cards there. Example
+asking. A scheduled run that reaches one of them saves its approval card in its conversation and notifies everyone, so the
+speech and video are approved there (sidebar **Scheduled**, or the notification). Example
 schedule prompt: "Write a 25-second Hebrew video ad script for <business/offer>, then
 send me a notification and list the media ids and the full script in your reply."
 

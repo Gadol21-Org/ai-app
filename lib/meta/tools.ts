@@ -66,7 +66,7 @@ export function makeMetaAdTools(): Record<string, AgentTool> {
   });
 
   return {
-    upload_ad_video: { tool: uploadAdVideo, requiresApproval: true, availableInScheduledRuns: false },
-    create_video_ad: { tool: createVideoAd, requiresApproval: true, availableInScheduledRuns: false },
+    upload_ad_video: { tool: uploadAdVideo, requiresApproval: true, availableInScheduledRuns: true },
+    create_video_ad: { tool: createVideoAd, requiresApproval: true, availableInScheduledRuns: true },
   };
 }

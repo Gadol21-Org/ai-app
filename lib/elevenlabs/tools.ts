@@ -265,14 +265,14 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
     // (a parked approval can't be resumed yet), so it writes the script and may make the presenter
     // image, then notifies; speech and video are made once a person continues in the conversation
     // that run saved.
-    generate_speech: { tool: generateSpeech, requiresApproval: true, availableInScheduledRuns: false },
+    generate_speech: { tool: generateSpeech, requiresApproval: true, availableInScheduledRuns: true },
     list_presenters: { tool: listPresentersTool, requiresApproval: false, availableInScheduledRuns: true },
     // Off unless generated presenters are explicitly allowed: the face must be the real person's.
     ...(allowGeneratedPresenter()
       ? { generate_image: { tool: generateImage, requiresApproval: false, availableInScheduledRuns: true } }
       : {}),
     list_media: { tool: listMediaTool, requiresApproval: false, availableInScheduledRuns: true },
-    generate_talking_video: { tool: generateTalkingVideo, requiresApproval: true, availableInScheduledRuns: false },
-    generate_scene_video: { tool: generateSceneVideo, requiresApproval: true, availableInScheduledRuns: false },
+    generate_talking_video: { tool: generateTalkingVideo, requiresApproval: true, availableInScheduledRuns: true },
+    generate_scene_video: { tool: generateSceneVideo, requiresApproval: true, availableInScheduledRuns: true },
   };
 }
