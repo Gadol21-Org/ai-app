@@ -1,5 +1,7 @@
 import "server-only";
-import { tool, type ToolSet } from "ai";
+import { jsonSchema, tool, type ToolSet } from "ai";
+import { buildPresentParameters } from "@assistant-ui/generative-ui/react";
+import { schemaOnlyVocabulary } from "@/lib/generative-ui-vocabulary";
 import { z } from "zod";
 import { createSchedule, deleteSchedule, getSchedule, listSchedules } from "@/lib/schedules/store";
 import { t } from "@/lib/i18n";
@@ -7,6 +9,7 @@ import { getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
 import { listUsers } from "@/lib/users";
 import { displayName } from "@/lib/auth";
 import { sendNotification } from "@/lib/notifications/service";
+import { chartSpecSchema } from "@/lib/chart-spec";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
 /**
@@ -167,7 +170,38 @@ function makeSendNotificationTool(ctx: ToolContext) {
   });
 }
 
+const renderChartTool = tool({
+  description:
+    "Draw a chart in the chat from numbers you already have (from your tools or the conversation). " +
+    "Use it whenever the user asks for a graph or chart, or when a trend, comparison or share of a total is clearer drawn than listed. " +
+    "Call it once per chart, then add one or two sentences of insight in your own words; do not repeat the numbers as a table. " +
+    "It cannot fetch data: get the numbers first.",
+  inputSchema: chartSpecSchema,
+  execute: async (spec) => ({
+    shown: true as const,
+    type: spec.type,
+    rows: spec.data.length,
+    series: spec.series.length,
+  }),
+});
+
+const presentTool = tool({
+  description:
+    "Show a composed answer: a layout of cards, facts (a label with a big number and its change), short text, tables and charts, drawn in the chat. " +
+    "Use it when the answer is a small report, such as a summary with key numbers, a comparison, or a chart together with the facts around it. " +
+    "Use render_chart instead when a single chart is all that is needed, and plain text for everything else. " +
+    "Every node picks a component with `_type` and nests others under `children`; wrap several top-level pieces in one Col. " +
+    "Put DataChart inside a Card whose title names it. Use real numbers from your tools, then add one or two sentences of insight after the call. " +
+    "Write all visible text in Hebrew unless the user used another language.",
+  inputSchema: jsonSchema<Record<string, unknown>>(
+    buildPresentParameters(schemaOnlyVocabulary()),
+  ),
+  execute: async () => ({ shown: true as const }),
+});
+
 const registry: Record<string, AgentTool> = {
+  present: { tool: presentTool, requiresApproval: false, availableInScheduledRuns: false },
+  render_chart: { tool: renderChartTool, requiresApproval: false, availableInScheduledRuns: false },
   add_schedule: { tool: addSchedule, requiresApproval: true, availableInScheduledRuns: false },
   list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
   list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },

@@ -66,6 +66,7 @@ tapping Allow/Deny on an approval card, that counts as Deny.
   restarts and a firing missed during downtime runs once on startup. Repeats use cron expressions
   ([croner](https://github.com/Hexagon/croner)) in `SCHEDULE_TIMEZONE`.
 - Tools live in `lib/tools.ts`, which also says which need approval and which scheduled runs may use.
+- `render_chart` draws line, bar, area, pie and scatter charts from data the model passes in (`lib/chart-spec.ts` is the spec, `components/assistant-ui/elements/chart-tool.aui.tsx` draws it with Recharts).
   Scheduled runs cannot add schedules.
 - Push notifications are not built. A scheduled run that reaches a tool needing approval is parked
   as a `pending_approvals` row, the run is marked "awaiting approval", and
