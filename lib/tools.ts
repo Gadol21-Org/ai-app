@@ -7,6 +7,7 @@ import { getMcpTools, mcpToolRequiresApproval } from "@/lib/mcp";
 import { listUsers } from "@/lib/users";
 import { displayName } from "@/lib/auth";
 import { sendNotification } from "@/lib/notifications/service";
+import { chartSpecSchema } from "@/lib/chart-spec";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
 
 /**
@@ -167,7 +168,23 @@ function makeSendNotificationTool(ctx: ToolContext) {
   });
 }
 
+const renderChartTool = tool({
+  description:
+    "Draw a chart in the chat from numbers you already have (from your tools or the conversation). " +
+    "Use it whenever the user asks for a graph or chart, or when a trend, comparison or share of a total is clearer drawn than listed. " +
+    "Call it once per chart, then add one or two sentences of insight in your own words; do not repeat the numbers as a table. " +
+    "It cannot fetch data: get the numbers first.",
+  inputSchema: chartSpecSchema,
+  execute: async (spec) => ({
+    shown: true as const,
+    type: spec.type,
+    rows: spec.data.length,
+    series: spec.series.length,
+  }),
+});
+
 const registry: Record<string, AgentTool> = {
+  render_chart: { tool: renderChartTool, requiresApproval: false, availableInScheduledRuns: false },
   add_schedule: { tool: addSchedule, requiresApproval: true, availableInScheduledRuns: false },
   list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
   list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },

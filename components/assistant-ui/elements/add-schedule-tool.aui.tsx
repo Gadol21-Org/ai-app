@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { CalendarClock, Trash2 } from "lucide-react";
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
+import { RenderChartTool } from "@/components/assistant-ui/elements/chart-tool.aui";
 import { ToolFallback } from "@/components/assistant-ui/elements/tool-fallback.aui";
 import { describeTiming } from "@/lib/schedules/timing";
 import { t } from "@/lib/i18n";
@@ -160,7 +161,9 @@ export const DeleteScheduleTool: ToolCallMessagePartComponent = (props) => {
 
 /** Custom UI for specific tools; every other tool keeps the default collapsible card. */
 const renderTool: ToolCallMessagePartComponent = (props) =>
-  props.toolName === "add_schedule" ? (
+  props.toolName === "render_chart" ? (
+    <RenderChartTool {...props} />
+  ) : props.toolName === "add_schedule" ? (
     <AddScheduleTool {...props} />
   ) : props.toolName === "delete_schedule" ? (
     <DeleteScheduleTool {...props} />
