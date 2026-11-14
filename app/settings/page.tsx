@@ -45,6 +45,7 @@ function SpendCard({ label, hint, totals }: { label: string; hint: string; total
       <CardContent className="text-muted-foreground text-sm">
         {formatCount(totals.inputTokens)} {t.settings.tokensIn} · {formatCount(totals.outputTokens)} {t.settings.tokensOut} ·{" "}
         {formatCount(totals.calls)} {t.settings.modelCalls}
+        <div className="mt-1">{t.settings.groundingLine(formatCount(totals.searchQueries), formatCount(totals.mapsCalls))}</div>
         <div className="mt-1 text-xs">{hint}</div>
       </CardContent>
     </Card>

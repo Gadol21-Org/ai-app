@@ -67,6 +67,10 @@ export const usageEvents = mysqlTable(
     inputTokens: int("input_tokens").notNull().default(0),
     cachedInputTokens: int("cached_input_tokens").notNull().default(0),
     outputTokens: int("output_tokens").notNull().default(0),
+    /** Google Search queries Gemini ran for this call (grounding is free; only counted). */
+    searchQueries: int("search_queries").notNull().default(0),
+    /** Google Maps grounded lookups made for this call (free; only counted). */
+    mapsCalls: int("maps_calls").notNull().default(0),
     costUsd: decimal("cost_usd", { precision: 14, scale: 8 }).notNull().default("0"),
     createdAt: createdAt(),
   },

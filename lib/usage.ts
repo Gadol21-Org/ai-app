@@ -13,6 +13,9 @@ export async function recordUsage(opts: {
   kind: "chat" | "title" | "schedule";
   modelId: string;
   usage: LanguageModelUsage;
+  /** Free Google grounding used by the call (counted, not priced). */
+  searchQueries?: number;
+  mapsCalls?: number;
 }) {
   try {
     const tokens = toTokenCounts(opts.usage);
@@ -26,6 +29,8 @@ export async function recordUsage(opts: {
         kind: opts.kind,
         model: opts.modelId,
         ...tokens,
+        searchQueries: opts.searchQueries ?? 0,
+        mapsCalls: opts.mapsCalls ?? 0,
         costUsd: (cost ?? 0).toFixed(8),
       });
   } catch (error) {
@@ -38,9 +43,11 @@ const totals = {
   inputTokens: sql<string>`coalesce(sum(${usageEvents.inputTokens}), 0)`.mapWith(Number),
   outputTokens: sql<string>`coalesce(sum(${usageEvents.outputTokens}), 0)`.mapWith(Number),
   calls: sql<string>`count(*)`.mapWith(Number),
+  searchQueries: sql<string>`coalesce(sum(${usageEvents.searchQueries}), 0)`.mapWith(Number),
+  mapsCalls: sql<string>`coalesce(sum(${usageEvents.mapsCalls}), 0)`.mapWith(Number),
 };
 
-export type SpendTotals = { costUsd: number; inputTokens: number; outputTokens: number; calls: number };
+export type SpendTotals = { costUsd: number; inputTokens: number; outputTokens: number; calls: number; searchQueries: number; mapsCalls: number };
 export type ConversationSpend = SpendTotals & {
   threadId: string | null;
   title: string | null;

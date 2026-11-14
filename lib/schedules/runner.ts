@@ -9,6 +9,7 @@ import { formatDateTime } from "@/lib/format";
 import { createThread, saveUIMessage } from "@/lib/threads";
 import { TURN_CONTEXT_KEY } from "@/lib/turn-context";
 import { recordUsage } from "@/lib/usage";
+import { countGrounding, withGrounding } from "@/lib/grounding";
 import {
   claimDueSchedules,
   failInterruptedRuns,
@@ -71,10 +72,11 @@ export async function runSchedule(schedule: Schedule) {
       // Constant across runs (cacheable); the run's own details go after the prompt instead.
       system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching right now, so do not ask questions. A tool that needs a person's approval pauses the task: its card is saved in this conversation and everyone is notified. Do the preparation that needs no approval first, then request the approval-requiring call, and say in your reply what is waiting for approval. When someone answers, the conversation continues from there.`,
       prompt: `${schedule.prompt}\n\n<context>\n${context.note}\n</context>`,
-      tools,
+      tools: withGrounding(tools, modelId),
       toolApproval: getToolApproval(tools),
       stopWhen: isStepCount(10),
-      onFinish: ({ totalUsage }) => recordUsage({ threadId, kind: "schedule", modelId, usage: totalUsage }),
+      onFinish: ({ totalUsage, steps }) =>
+        recordUsage({ threadId, kind: "schedule", modelId, usage: totalUsage, ...countGrounding(steps) }),
     });
 
     // The reply is saved the way a chat turn's is, tool calls and approval cards included, so the

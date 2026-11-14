@@ -15,6 +15,7 @@ import {
   updateThread,
 } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
+import { countGrounding, withGrounding } from "@/lib/grounding";
 import {
   TURN_CONTEXT_INSTRUCTIONS,
   TURN_CONTEXT_KEY,
@@ -152,17 +153,18 @@ export async function POST(req: Request) {
       }),
       toolCalls: "before-last-4-messages",
     }),
-    tools,
+    tools: withGrounding(tools, modelId),
     toolApproval: getToolApproval(tools, allowedTools),
     // Building a trip means many tool calls in a row.
     stopWhen: isStepCount(10),
-    onFinish: ({ totalUsage }) =>
+    onFinish: ({ totalUsage, steps }) =>
       recordUsage({
         threadId,
         userId: user.id,
         kind: "chat",
         modelId,
         usage: totalUsage,
+        ...countGrounding(steps),
       }),
   });
 

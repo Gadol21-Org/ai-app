@@ -12,6 +12,9 @@ import { displayName } from "@/lib/auth";
 import { makeAdTools } from "@/lib/elevenlabs/tools";
 import { makeMetaAdTools } from "@/lib/meta/tools";
 import { conversationUrl } from "@/lib/conversation-url";
+import { askGoogleMaps } from "@/lib/grounding";
+import { recordUsage } from "@/lib/usage";
+import { getChatModelId } from "@/lib/models";
 import { sendNotification } from "@/lib/notifications/service";
 import { chartSpecSchema } from "@/lib/chart-spec";
 import { describeTiming, scheduleTimezone, validateCron } from "@/lib/schedules/timing";
@@ -157,6 +160,26 @@ const deleteScheduleTool = tool({
   },
 });
 
+function makeAskGoogleMapsTool(ctx: ToolContext) {
+  return tool({
+    description:
+      "Ask a question answered with Google Maps data: find places (restaurants, shops, attractions), their addresses, ratings, opening hours, or what is near somewhere. " +
+      "Name the area in the question; pass latitude and longitude too when you know the user's position. For other web questions Google Search is already built in.",
+    inputSchema: z.object({
+      question: z.string().min(1).max(500),
+      latitude: z.number().min(-90).max(90).optional(),
+      longitude: z.number().min(-180).max(180).optional(),
+    }),
+    execute: async ({ question, latitude, longitude }) => {
+      const near = latitude !== undefined && longitude !== undefined ? { latitude, longitude } : undefined;
+      const result = await askGoogleMaps(question, near);
+      // The lookup is its own model call: its tokens are priced, the Maps lookup itself is free (counted only).
+      await recordUsage({ threadId: ctx.threadId ?? null, kind: "chat", modelId: getChatModelId(), usage: result.usage, mapsCalls: 1 });
+      return { answer: result.answer, places: result.places };
+    },
+  });
+}
+
 const listUsersTool = tool({
   description:
     "List the people who use this app: id, friendly name (null if none was set), email and when they were last seen. " +
@@ -239,6 +262,9 @@ function buildRegistry(ctx: ToolContext, scheduleGroups?: ToolGroupInfo[]): Reco
       add_schedule: { tool: makeAddScheduleTool(scheduleGroups ?? listScheduleToolGroups()), requiresApproval: true, availableInScheduledRuns: false },
       list_schedules: { tool: listSchedulesTool, requiresApproval: false, availableInScheduledRuns: false },
       delete_schedule: { tool: deleteScheduleTool, requiresApproval: true, availableInScheduledRuns: false },
+    }),
+    ...inGroup("maps", {
+      ask_google_maps: { tool: makeAskGoogleMapsTool(ctx), requiresApproval: false, availableInScheduledRuns: true },
     }),
     ...inGroup("notifications", {
       list_users: { tool: listUsersTool, requiresApproval: false, availableInScheduledRuns: true },
