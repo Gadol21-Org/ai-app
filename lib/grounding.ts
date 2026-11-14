@@ -1,42 +1,63 @@
 import "server-only";
 import { google } from "@ai-sdk/google";
 import { generateText, type ToolSet } from "ai";
-import { getChatModel, getChatModelId } from "@/lib/models";
+import { getChatModel, getChatModelId, modelProviderOptions } from "@/lib/models";
 
 /**
  * Gemini's built-in Google grounding, billed by Google as free for us (we count it, at $0).
  *
- * Google Search runs inside the chat request itself: Gemini 3+ allows it next to our own function
- * tools (the SDK sends `includeServerSideToolInvocations`), and the model decides per turn whether
- * to search. Google Maps grounding cannot share a request with Google Search ("cannot be combined"),
- * so Maps is a normal tool (`ask_google_maps`, see lib/tools.ts) that makes its own small
- * Maps-grounded call and hands the answer back.
+ * Google Search runs inside the chat request itself, next to our own function tools; the model decides
+ * per turn whether to search. Google Maps can share the request with Search on the models listed in
+ * NATIVE_SEARCH_AND_MAPS (Interactions API only; the others reject the pair with "cannot be combined"),
+ * so there Maps is native too. On every other model Maps is the `ask_google_maps` tool (lib/tools.ts),
+ * which makes its own small Maps-grounded call and hands the answer back.
  */
 
-/** The provider-executed tools added to every chat and scheduled-run model call. */
-export function groundingTools(modelId: string): ToolSet {
-  if (!modelId.startsWith("google:")) return {};
-  return { google_search: google.tools.googleSearch({}) };
+/** Models verified to accept Search and Maps in one Interactions request. */
+const NATIVE_SEARCH_AND_MAPS = new Set(["google:gemini-3.8-flash", "google:gemini-3.6-flash"]);
+
+export const hasNativeMaps = (modelId: string) => NATIVE_SEARCH_AND_MAPS.has(modelId);
+
+/** The chat tools plus the provider-executed grounding tools that suit the model. */
+export function withGrounding(tools: ToolSet, modelId: string): ToolSet {
+  if (!modelId.startsWith("google:")) return tools;
+  if (!hasNativeMaps(modelId)) return { ...tools, google_search: google.tools.googleSearch({}) };
+  // Native Maps replaces the fallback tool, so the model sees one way to look at places.
+  const { ask_google_maps: _fallback, ...rest } = tools;
+  return { ...rest, google_search: google.tools.googleSearch({}), google_maps: google.tools.googleMaps({}) };
 }
 
-type StepLike = { providerMetadata?: unknown };
+type StepLike = {
+  usage?: { raw?: unknown };
+  content?: readonly { type: string; toolName?: string; providerExecuted?: boolean; input?: unknown }[];
+};
 
-/** How many Google Search queries the model ran across the steps of a call (from Gemini's grounding metadata). */
-export function countSearchQueries(steps: readonly StepLike[]): number {
-  let total = 0;
+/**
+ * Google Search queries and Maps lookups across the steps of a call. Prefers Google's own count
+ * (`grounding_tool_count` in the Interactions usage); otherwise counts the provider-executed tool calls.
+ */
+export function countGrounding(steps: readonly StepLike[]): { searchQueries: number; mapsCalls: number } {
+  let searchQueries = 0;
+  let mapsCalls = 0;
   for (const step of steps) {
-    const meta = (
-      step.providerMetadata as
-        | {
-            google?: {
-              groundingMetadata?: { webSearchQueries?: string[] | null } | null;
-            };
-          }
-        | undefined
-    )?.google?.groundingMetadata;
-    total += meta?.webSearchQueries?.length ?? 0;
+    const counts = (step.usage?.raw as { grounding_tool_count?: { type?: string | null; count?: number | null }[] | null } | undefined)
+      ?.grounding_tool_count;
+    if (counts?.length) {
+      for (const c of counts) {
+        if (c.type === "google_search") searchQueries += c.count ?? 0;
+        else if (c.type === "google_maps") mapsCalls += c.count ?? 0;
+      }
+      continue;
+    }
+    for (const part of step.content ?? []) {
+      if (part.type !== "tool-call" || !part.providerExecuted) continue;
+      if (part.toolName?.includes("google_search")) {
+        const queries = (part.input as { queries?: unknown[] } | undefined)?.queries;
+        searchQueries += Array.isArray(queries) && queries.length > 0 ? queries.length : 1;
+      } else if (part.toolName?.includes("google_maps")) mapsCalls += 1;
+    }
   }
-  return total;
+  return { searchQueries, mapsCalls };
 }
 
 export type MapsAnswer = {
