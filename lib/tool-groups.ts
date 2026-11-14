@@ -38,6 +38,11 @@ export const KNOWN_GROUPS: Record<string, Omit<ToolGroupInfo, "id">> = {
     label: "וונדרלוג",
     description: "The family's Wanderlog trip plans: read trips, places and itineraries and edit them (edits wait for a person's approval).",
   },
+  maps: {
+    label: "מפות גוגל",
+    description:
+      "ask_google_maps: look up places, opening hours, ratings, addresses and distances with Google Maps data. Enable it for tasks about places or locations.",
+  },
   charts: {
     label: "תרשימים והצגה",
     description: "Draw charts and composed reports in the chat. Needs a person looking at the chat, so it is not available to scheduled runs.",

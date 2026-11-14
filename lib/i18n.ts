@@ -245,6 +245,7 @@ export const t = {
     tokensIn: "טוקנים נכנסים",
     tokensOut: "יוצאים",
     modelCalls: "קריאות למודל",
+    groundingLine: (searches: string, maps: string) => `חיפושי Google: ${searches} · קריאות Maps: ${maps} (חינם)`,
     byConversation: "לפי שיחה",
     noSpend: "אין עדיין הוצאות. העלויות יופיעו כאן אחרי התשובה הראשונה.",
     colConversation: "שיחה",
@@ -334,6 +335,8 @@ export const t = {
   toolNames: {
     list_schedules: "רשימת תזמונים",
     list_users: "רשימת משתמשים",
+    ask_google_maps: "חיפוש ב-Google Maps",
+    google_search: "חיפוש בגוגל",
     send_notification: "שליחת התראה",
     list_voices: "חיפוש קולות",
     generate_speech: "יצירת דיבור",
