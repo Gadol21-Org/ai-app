@@ -1,6 +1,6 @@
 import { convertToModelMessages, generateId, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
 import { getCurrentUser, unauthorized } from "@/lib/auth";
-import { getChatModel, resolveChatModelId } from "@/lib/models";
+import { getChatModel, modelProviderOptions, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { describeNow, scheduleTimezone } from "@/lib/schedules/timing";
 import { getChatTools, getScheduledRunTools, getToolApproval } from "@/lib/tools";
@@ -142,6 +142,7 @@ export async function POST(req: Request) {
   const result = streamText({
     abortSignal: req.signal,
     model: getChatModel(modelId),
+    providerOptions: modelProviderOptions,
     // Constant, so the provider's prompt cache can reuse it and the conversation after it.
     system: `${SYSTEM_PROMPT}\n\n${TURN_CONTEXT_INSTRUCTIONS} When a tool call is not approved, do not retry it.`,
     messages: pruneMessages({

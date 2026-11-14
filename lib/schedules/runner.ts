@@ -1,7 +1,7 @@
 import "server-only";
 import { generateId, isStepCount, streamText, type UIMessage } from "ai";
 import { approvalCards, expireStaleApprovals, notifyApprovalNeeded, trackApprovals } from "@/lib/approvals/pending";
-import { getChatModel, getChatModelId } from "@/lib/models";
+import { getChatModel, getChatModelId, modelProviderOptions } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { getScheduledRunTools, getToolApproval } from "@/lib/tools";
 import { t } from "@/lib/i18n";
@@ -67,6 +67,7 @@ export async function runSchedule(schedule: Schedule) {
     const result = streamText({
       abortSignal: AbortSignal.timeout(RUN_TIMEOUT_MS),
       model: getChatModel(),
+      providerOptions: modelProviderOptions,
       // Constant across runs (cacheable); the run's own details go after the prompt instead.
       system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching right now, so do not ask questions. A tool that needs a person's approval pauses the task: its card is saved in this conversation and everyone is notified. Do the preparation that needs no approval first, then request the approval-requiring call, and say in your reply what is waiting for approval. When someone answers, the conversation continues from there.`,
       prompt: `${schedule.prompt}\n\n<context>\n${context.note}\n</context>`,
