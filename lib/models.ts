@@ -10,7 +10,8 @@ import { DEFAULT_CHAT_MODEL, isSelectableModel } from "@/lib/model-catalog";
  * and add one entry to `providers`. Nothing else in the app needs to change.
  */
 const providers: Record<string, (modelId: string) => LanguageModel> = {
-  google: (modelId) => google(modelId),
+  // The Interactions API (not generateContent): it lets Google Search and Maps be used together on newer models.
+  google: (modelId) => google.interactions(modelId as Parameters<typeof google.interactions>[0]),
 };
 
 /**
@@ -31,6 +32,12 @@ export function getChatModel(spec = getChatModelId()) {
   }
   return create(rest.join(":"));
 }
+
+/**
+ * Provider options for every model call. Stateless: the app owns the conversation history and sends it in
+ * full each turn, so Google keeps no copy of the chat (Interactions stores by default, 1 day on the free tier).
+ */
+export const modelProviderOptions = { google: { store: false } };
 
 /** The model for a chat request: the person's pick when it is a known option, else the default. */
 export function resolveChatModelId(requested?: unknown) {
