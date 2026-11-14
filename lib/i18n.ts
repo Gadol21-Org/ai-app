@@ -309,6 +309,12 @@ export const t = {
     errNoRecipients: "לא נמצא אף נמען. יש להשתמש ב-list_users כדי לקבל מזהים, או לכתוב \"all\".",
   },
 
+  webFetch: {
+    errNotInConversation:
+      "This address was not mentioned in the conversation. Ask the user for the link, or fetch a page of a site they already mentioned.",
+    errFailed: "The page could not be fetched.",
+  },
+
   errors: {
     invalidId: "מזהה לא תקין",
     notFound: "לא נמצא",
@@ -318,6 +324,7 @@ export const t = {
 
   /** Hebrew names for agent tools; a tool without an entry is shown by its code name. */
   toolNames: {
+    fetch_url: "קריאת דף אינטרנט",
     list_schedules: "רשימת תזמונים",
     list_users: "רשימת משתמשים",
     send_notification: "שליחת התראה",
