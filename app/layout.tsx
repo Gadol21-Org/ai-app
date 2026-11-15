@@ -51,6 +51,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="he" dir="rtl" suppressHydrationWarning>
+      <head>
+        {/* use-credentials: send the Cloudflare Access cookie, or the manifest request is redirected to the login page. */}
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
+      </head>
       <body className={`${inter.variable} ${heebo.variable} ${ibmPlexMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <TooltipProvider>{children}</TooltipProvider>
