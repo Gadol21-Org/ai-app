@@ -114,8 +114,8 @@ export const threadListAdapter: RemoteThreadListAdapter = {
   /** The server names the conversation with the chat model, from the messages it saved, and saves the title. */
   async generateTitle(id) {
     return createAssistantStream(async (controller) => {
-      const { title } = await api<{ title: string }>(`/${id}/title`, { method: "POST" });
-      controller.appendText(title);
+      const { title } = await api<{ title: string | null }>(`/${id}/title`, { method: "POST" });
+      if (title) controller.appendText(title);
     });
   },
 
