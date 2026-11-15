@@ -508,7 +508,8 @@ const Composer: FC<{ autoFocus: boolean }> = ({ autoFocus }) => {
                       className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
                       rows={1}
                       autoFocus={autoFocus}
-                      enterKeyHint="send"
+                      submitMode="ctrlEnter"
+                      enterKeyHint="enter"
                       aria-label={t.chat.composerLabel}
                     /><ComposerAction /></ComposerPrimitive.AttachmentDropzone>
     </ComposerPrimitive.Root>
@@ -802,6 +803,7 @@ const EditComposer: FC = () => {
       <ComposerPrimitive.Root className="aui-edit-composer-root border-foreground/10 focus-within:border-foreground/25 me-auto flex w-full max-w-[85%] cursor-text flex-col rounded-(--composer-radius) border bg-(--composer-bg) transition-[border-color]">
         <ComposerPrimitive.Input
                       dir="auto"
+          submitMode="ctrlEnter"
           className="aui-edit-composer-input text-foreground min-h-14 w-full resize-none bg-transparent px-4 pt-3 pb-1 text-base outline-none"
           autoFocus
         />
