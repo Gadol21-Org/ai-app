@@ -20,6 +20,8 @@ export type ApprovalView = {
   title: string;
   /** The call removes or deletes something, so the card is drawn more cautiously. */
   destructive: boolean;
+  /** The call can spend money or change what is live; drawn in amber with this one-line warning. */
+  caution: string | null;
   /** Short lines shown above the fields (what exactly will happen). */
   highlights: { label: string; value: FieldValue }[];
   fields: Field[];
@@ -122,7 +124,74 @@ export function valueText(value: FieldValue): string {
  * Tool-specific views. They pull the one or two fields that decide whether to allow the call into
  * `highlights` and leave the rest to the generic field list.
  */
-const tailored: Record<string, (args: Record<string, unknown>) => Pick<ApprovalView, "highlights"> & { omit: string[] }> = {
+type Tailored = Pick<ApprovalView, "highlights"> & { omit: string[]; caution?: string | null; note?: string };
+
+/** Pulls the first present key of each group into a labeled highlight and hides those keys from the field list. */
+function pickHighlights(args: Record<string, unknown>, groups: Array<[label: string, ...keys: string[]]>) {
+  const highlights: ApprovalView["highlights"] = [];
+  const omit: string[] = [];
+  for (const [label, ...keys] of groups) {
+    for (const key of keys) {
+      const value = toFieldValue(key, args[key]);
+      if (!value) continue;
+      highlights.push({ label, value });
+      omit.push(...keys);
+      break;
+    }
+  }
+  return { highlights, omit };
+}
+
+const spends = (args: Record<string, unknown>) =>
+  ["budget", "daily_budget", "dailyBudget", "lifetime_budget", "lifetimeBudget", "bid_amount", "bidAmount"].some((k) => args[k] != null);
+const goesLive = (args: Record<string, unknown>) =>
+  [args.status, args.effective_status, args.state].some((v) => typeof v === "string" && /^active$/i.test(v.trim()));
+
+const m = t.approvalCard.meta;
+const BUDGET: [string, ...string[]] = [m.budget, "daily_budget", "dailyBudget", "budget", "lifetime_budget", "lifetimeBudget"];
+const DATES: Array<[string, ...string[]]> = [
+  [m.starts, "start_time", "startTime", "start_date", "startDate"],
+  [m.ends, "end_time", "endTime", "end_date", "endDate"],
+];
+
+const tailored: Record<string, (args: Record<string, unknown>) => Tailored> = {
+  ads_create_campaign: (a) => ({
+    ...pickHighlights(a, [[m.name, "name"], [m.objective, "objective"], BUDGET, ...DATES]),
+    note: m.createdPaused,
+  }),
+  ads_create_ad_set: (a) => ({
+    ...pickHighlights(a, [[m.name, "name"], [m.campaign, "campaign_id", "campaignId"], BUDGET, [m.audience, "targeting", "audience"], ...DATES, [m.goal, "optimization_goal", "optimizationGoal"]]),
+    note: m.createdPaused,
+  }),
+  ads_create_ad: (a) => ({
+    ...pickHighlights(a, [[m.name, "name"], [m.adSet, "adset_id", "ad_set_id", "adSetId"], [m.headline, "headline", "title"], [m.text, "message", "body", "primary_text"], [m.destination, "link", "link_url", "url", "website_url"]]),
+    note: m.createdPaused,
+  }),
+  ads_update_entity: (a) => ({
+    ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.name, "name"], BUDGET, [m.status, "status"], ...DATES]),
+    caution: spends(a) || goesLive(a) ? m.changeCaution : null,
+  }),
+  ads_activate_entity: (a) => ({
+    ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.entityType, "entity_type", "entityType", "type"]]),
+    caution: m.activateCaution,
+  }),
+  ads_catalog_create: (a) => pickHighlights(a, [[m.name, "name"]]),
+  upload_ad_video: (a) => ({
+    ...pickHighlights(a, [[m.title, "title"], [m.mediaId, "mediaId"]]),
+    note: m.uploadNote,
+  }),
+  create_video_ad: (a) => ({
+    ...pickHighlights(a, [
+      [m.name, "name"],
+      [m.adSet, "adSetId"],
+      [m.page, "pageId"],
+      [m.text, "message"],
+      [m.headline, "headline"],
+      [m.destination, "linkUrl"],
+      [m.button, "callToAction"],
+    ]),
+    note: m.createdPaused,
+  }),
   fetch_url: (args) => {
     const url = typeof args.url === "string" ? asUrl(args.url.trim()) : null;
     const highlights: ApprovalView["highlights"] = [];
@@ -142,12 +211,14 @@ const tailored: Record<string, (args: Record<string, unknown>) => Pick<ApprovalV
 
 export function describeToolCall(toolName: string, args: unknown): ApprovalView {
   const record = args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {};
-  const custom = tailored[toolName]?.(record);
+  const custom = Object.hasOwn(tailored, toolName) ? tailored[toolName]!(record) : undefined;
+  if (custom?.note) custom.highlights.push({ label: "", value: { kind: "text", text: custom.note } });
   const rest = custom ? Object.fromEntries(Object.entries(record).filter(([k]) => !custom.omit.includes(k))) : record;
   return {
     tool: toolName,
     title: toolDisplayName(toolName),
     destructive: isDestructiveTool(toolName),
+    caution: custom?.caution ?? null,
     highlights: custom?.highlights ?? [],
     fields: fieldsOf(rest),
   };
