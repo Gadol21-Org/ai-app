@@ -36,6 +36,32 @@ import { t } from "@/lib/i18n";
 
 export const maxDuration = 60;
 
+/** One line per model step: input vs cached tokens, and how big the tool results fed to the next step are. */
+function logStepUsage(
+  threadId: string,
+  modelId: string,
+  step: {
+    stepNumber: number;
+    usage: { inputTokens?: number; outputTokens?: number; inputTokenDetails?: { cacheReadTokens?: number } };
+    toolCalls: { toolName: string }[];
+    toolResults: { output?: unknown }[];
+  },
+) {
+  const resultChars = step.toolResults.reduce((n, r) => n + (JSON.stringify(r.output) ?? "").length, 0);
+  console.log(
+    `[chat-usage] ${JSON.stringify({
+      threadId,
+      modelId,
+      step: step.stepNumber,
+      input: step.usage.inputTokens ?? 0,
+      cached: step.usage.inputTokenDetails?.cacheReadTokens ?? 0,
+      output: step.usage.outputTokens ?? 0,
+      tools: step.toolCalls.map((c) => c.toolName),
+      resultChars,
+    })}`,
+  );
+}
+
 const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= 64;
 
 /**
@@ -139,6 +165,9 @@ export async function POST(req: Request) {
     toolApproval: getToolApproval(tools, allowedTools),
     // Building a trip means many tool calls in a row.
     stopWhen: isStepCount(10),
+    // Every step re-sends the system prompt, tool declarations and all earlier steps' tool results,
+    // so a long tool chain multiplies input tokens. One log line per step shows where they go.
+    onStepEnd: (step) => logStepUsage(threadId, modelId, step),
     onFinish: ({ totalUsage }) =>
       recordUsage({
         threadId,
