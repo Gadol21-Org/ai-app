@@ -36,7 +36,17 @@ import { t } from "@/lib/i18n";
 export type McpServerConfig = (
   | { url: string; headers?: Record<string, string> }
   | { command: string; args?: string[]; env?: Record<string, string> }
-) & { requireApproval?: "all" | "none" | string[]; allowTools?: string[] };
+) & {
+  requireApproval?: "all" | "none" | string[];
+  allowTools?: string[];
+  /**
+   * Tools that are not offered to the model at all. Every tool declaration is sent on every model
+   * step, so tools nobody uses only cost tokens.
+   */
+  hideTools?: string[];
+  /** Shorter replacement descriptions by tool name (a long description is paid for on every step). */
+  toolDescriptions?: Record<string, string>;
+};
 
 /** Tool results longer than this are cut before they reach the chat, the DB or the model. */
 export const MAX_TOOL_RESULT_CHARS =
@@ -51,6 +61,38 @@ const MCP_SERVERS_DIR =
  * (github.com/shaikhspeare/wanderlog-mcp), which signs in with the account's
  * `connect.sid` session cookie.
  */
+/** Guides and the trip link are not used by the family. */
+const WANDERLOG_HIDDEN_TOOLS = ["wanderlog_search_guides", "wanderlog_get_guide", "wanderlog_get_trip_url"];
+
+/**
+ * The package's own descriptions run to several paragraphs of itinerary-writing advice, which would
+ * be sent on every step of every chat. These say what each tool does; each tool's arguments keep
+ * their own descriptions.
+ */
+const WANDERLOG_DESCRIPTIONS: Record<string, string> = {
+  wanderlog_list_trips: "List the user's Wanderlog trips with title, dates and trip_key (the key the other tools need).",
+  wanderlog_get_trip:
+    "Get one trip's itinerary: hotels, places to visit and each day's places. Use 'concise' to summarize and 'detailed' for addresses, phone numbers and hotel dates. Needs trip_key (from list_trips).",
+  wanderlog_search_places:
+    "Search for restaurants, attractions, hotels and other places near a trip's destination. Returns candidates; use add_place to add one.",
+  wanderlog_create_trip: "Create an empty trip for a destination and date range, with one section per day.",
+  wanderlog_add_place:
+    "Add a place to a trip's day or its places-to-visit list. 'note' and start/end time can be set on the place itself.",
+  wanderlog_add_hotel: "Add a hotel booking with check-in and check-out dates.",
+  wanderlog_add_note: "Add a free-standing text note between places on a day (use add_place's note for a note about one place).",
+  wanderlog_add_checklist: "Add a checklist to the trip or to one day.",
+  wanderlog_annotate_place: "Set a note and/or start/end time on a place already in the trip.",
+  wanderlog_add_expense: "Add a budget expense linked to a place that is already in the trip.",
+  wanderlog_remove_place:
+    "Remove a place, flight, train or hotel by name or reference (e.g. 'the hotel', 'Gardens on day 3', '2nd Gardens'). Asks which one if ambiguous.",
+  wanderlog_edit_note:
+    "Find and replace text in notes, place notes and checklist items. Case-insensitive; lists the matches if there are several.",
+  wanderlog_remove_note: "Delete a note by matching part of its text, optionally on one day.",
+  wanderlog_update_trip_dates:
+    "Change a trip's date range. Refuses if days with content would be removed, unless force is true.",
+  wanderlog_rename_day: "Set the heading of one day (an empty heading resets it).",
+};
+
 function wanderlogServer(): McpServerConfig | undefined {
   const cookie = process.env.WANDERLOG_COOKIE?.trim();
   if (!cookie) return undefined;
@@ -71,6 +113,8 @@ function wanderlogServer(): McpServerConfig | undefined {
     env: { WANDERLOG_COOKIE: cookie },
     // The read-only tools (get/list/search) run without asking; add/edit/remove/move/... still ask.
     allowTools: ["wanderlog_get_*", "wanderlog_list_*", "wanderlog_search_*"],
+    hideTools: WANDERLOG_HIDDEN_TOOLS,
+    toolDescriptions: WANDERLOG_DESCRIPTIONS,
   };
 }
 
@@ -128,6 +172,19 @@ export function resultToText(result: unknown): string {
       ? JSON.stringify(structuredContent)
       : t.mcp.emptyResult)
   );
+}
+
+/** Drops the server's `hideTools` and swaps in its shorter `toolDescriptions`. */
+function adjustTools(tools: ToolSet, config: McpServerConfig): ToolSet {
+  const hidden = Array.isArray(config.hideTools) ? config.hideTools : [];
+  const descriptions = config.toolDescriptions ?? {};
+  const adjusted: ToolSet = {};
+  for (const [name, tool] of Object.entries(tools)) {
+    if (hidden.some((pattern) => typeof pattern === "string" && matchesToolPattern(name, pattern))) continue;
+    const description = descriptions[name];
+    adjusted[name] = description ? ({ ...tool, description } as typeof tool) : tool;
+  }
+  return adjusted;
 }
 
 function limitResults(tools: ToolSet): ToolSet {
@@ -215,7 +272,9 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
     pending = (async () => {
       const client = await connect(name, config);
       try {
-        const tools = limitResults(await client.tools()) as ToolSet;
+        const tools = limitResults(
+          adjustTools(await client.tools(), config),
+        ) as ToolSet;
         for (const toolName of Object.keys(tools)) {
           if (needsApproval(toolName, config))
             approvalRequired.add(toolName);
