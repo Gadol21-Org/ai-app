@@ -30,7 +30,7 @@ one line to the `providers` map; the chat route and UI don't change.
 | `app/api/chat/route.ts` | Streams the model's reply (AI SDK `streamText`). Tools will be added here. |
 | `app/assistant.tsx` | assistant-ui runtime wired to `/api/chat`, with the thread list and chat. |
 | `components/assistant-ui`, `components/ui` | Components installed with the shadcn CLI (`npx shadcn add @assistant-ui/...`). |
-| `app/manifest.ts`, `public/sw.js` | PWA manifest and service worker. |
+| `app/manifest.webmanifest/route.ts`, `public/sw.js` | PWA manifest and service worker. |
 | `lib/models.ts` | The swappable model/provider layer. |
 | `lib/chat-storage.ts`, `app/api/threads` | Thread list and message history, client adapter and API. |
 | `app/settings/page.tsx`, `lib/usage.ts` | Spend page and its queries. |
