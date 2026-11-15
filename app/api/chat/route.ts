@@ -154,7 +154,11 @@ export async function POST(req: Request) {
     model: getChatModel(modelId),
     // Constant, so the provider's prompt cache can reuse it and the conversation after it.
     system: `${SYSTEM_PROMPT}\n\n${TURN_CONTEXT_INSTRUCTIONS} When a tool call is not approved, do not retry it.`,
+    // Ask for thought summaries so the chat can show them in its collapsible "thinking" section.
+    providerOptions: { google: { thinkingConfig: { includeThoughts: true } } },
     messages: pruneMessages({
+      // Thought summaries are for the person reading, so earlier ones are not sent back to the model.
+      reasoning: "before-last-message",
       // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
       messages: await convertToModelMessages(withTurnContexts(denyUnansweredApprovals(history)), {
         ignoreIncompleteToolCalls: true,
