@@ -21,6 +21,10 @@ This is the same VM, deploy key and `cloudflared` tunnel as budget-tracking, so 
 1. **Tunnel hostname.** In the Cloudflare tunnel add a public hostname (e.g. `ai.example.com`) to `http://localhost:8085`.
 2. **Protect it.** Cloudflare Zero Trust > Access > add a self-hosted application for that hostname, allowing only
    your family's emails. The app has no login of its own and spends your Gemini quota.
+   **Installing on Android.** The manifest link uses `crossorigin="use-credentials"` so the Access cookie is sent. If Chrome
+   still says the site can't be installed, add a second Access application (or a policy on the first) for the same
+   hostname with action **Bypass** (Everyone) for the paths `/manifest.webmanifest`, `/sw.js` and `/icons/*`. They hold
+   nothing private. Bypass policies must be in a separate app or ordered above the Allow policy.
 3. **GitHub settings** (Settings > Secrets and variables > Actions), same names as budget-tracking:
 
 | Kind | Name | Value |

@@ -30,7 +30,7 @@ one line to the `providers` map; the chat route and UI don't change.
 | `app/api/chat/route.ts` | Streams the model's reply (AI SDK `streamText`). Tools will be added here. |
 | `app/assistant.tsx` | assistant-ui runtime wired to `/api/chat`, with the thread list and chat. |
 | `components/assistant-ui`, `components/ui` | Components installed with the shadcn CLI (`npx shadcn add @assistant-ui/...`). |
-| `app/manifest.ts`, `public/sw.js` | PWA manifest and service worker. |
+| `app/manifest.webmanifest/route.ts`, `public/sw.js` | PWA manifest and service worker. |
 | `lib/models.ts` | The swappable model/provider layer. |
 | `lib/chat-storage.ts`, `app/api/threads` | Thread list and message history, client adapter and API. |
 | `app/settings/page.tsx`, `lib/usage.ts` | Spend page and its queries. |
@@ -67,6 +67,7 @@ tapping Allow/Deny on an approval card, that counts as Deny.
   restarts and a firing missed during downtime runs once on startup. Repeats use cron expressions
   ([croner](https://github.com/Hexagon/croner)) in `SCHEDULE_TIMEZONE`.
 - Tools live in `lib/tools.ts`, which also says which need approval and which scheduled runs may use.
+- `render_chart` draws line, bar, area, pie and scatter charts from data the model passes in (`lib/chart-spec.ts` is the spec, `components/assistant-ui/elements/chart-tool.aui.tsx` draws it with Recharts).
   Scheduled runs cannot add schedules.
 - Push notifications are not built. A scheduled run that reaches a tool needing approval is parked
   as a `pending_approvals` row, the run is marked "awaiting approval", and

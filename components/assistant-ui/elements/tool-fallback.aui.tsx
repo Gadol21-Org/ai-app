@@ -41,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { t, toolDisplayName } from "@/lib/i18n";
 import { MediaPreview, type MediaPreviewProps } from "@/components/media-preview";
+import { ApprovalCard, ToolCallDetails } from "./approval-card";
 
 const ANIMATION_DURATION = 200;
 
@@ -1235,6 +1236,7 @@ function ToolFallbackApprovalImpl({
 
 const ToolFallbackImpl: ToolCallMessagePartComponent = ({
   toolName,
+  args,
   argsText,
   result,
   isError,
@@ -1286,6 +1288,27 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
     }
   }, [approval, isRequiresAction, status?.type]);
 
+  // A call waiting for a decision is a card: what will happen as labeled fields, then Allow / Deny.
+  if (
+    approval != null &&
+    !isSettled(approval) &&
+    isRequiresAction
+  )
+    return (
+      <ApprovalCard toolName={toolName} args={args} argsText={argsText}>
+        <ToolFallbackApproval
+          addResult={addResult}
+          resume={resume}
+          interrupt={interrupt}
+          approval={approval}
+          respondToApproval={respondToApproval}
+          status={status}
+          allowInConversationFor={toolName}
+          className="pt-0"
+        />
+      </ApprovalCard>
+    );
+
   // A file the tool made (speech, image, video) is shown under the card, even while it is collapsed.
   const media = toolName.startsWith("generate_") ? mediaOf(result) : undefined;
 
@@ -1300,10 +1323,9 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
       />
       <ToolFallbackContent>
         <ToolFallbackError status={status} />
-        <ToolFallbackArgs
-          argsText={argsText}
-          className={cn(isCancelled && "opacity-60")}
-        />
+        <div className={cn(isCancelled && "opacity-60")}>
+          <ToolCallDetails toolName={toolName} args={args} argsText={argsText} />
+        </div>
         {shouldRenderApproval && (
           <ToolFallbackApproval
             addResult={addResult}

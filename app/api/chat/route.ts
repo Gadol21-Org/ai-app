@@ -36,6 +36,32 @@ import { t } from "@/lib/i18n";
 
 export const maxDuration = 60;
 
+/** One line per model step: input vs cached tokens, and how big the tool results fed to the next step are. */
+function logStepUsage(
+  threadId: string,
+  modelId: string,
+  step: {
+    stepNumber: number;
+    usage: { inputTokens?: number; outputTokens?: number; inputTokenDetails?: { cacheReadTokens?: number } };
+    toolCalls: { toolName: string }[];
+    toolResults: { output?: unknown }[];
+  },
+) {
+  const resultChars = step.toolResults.reduce((n, r) => n + (JSON.stringify(r.output) ?? "").length, 0);
+  console.log(
+    `[chat-usage] ${JSON.stringify({
+      threadId,
+      modelId,
+      step: step.stepNumber,
+      input: step.usage.inputTokens ?? 0,
+      cached: step.usage.inputTokenDetails?.cacheReadTokens ?? 0,
+      output: step.usage.outputTokens ?? 0,
+      tools: step.toolCalls.map((c) => c.toolName),
+      resultChars,
+    })}`,
+  );
+}
+
 const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0 && v.length <= 64;
 
 /**
@@ -128,7 +154,11 @@ export async function POST(req: Request) {
     model: getChatModel(modelId),
     // Constant, so the provider's prompt cache can reuse it and the conversation after it.
     system: `${SYSTEM_PROMPT}\n\n${TURN_CONTEXT_INSTRUCTIONS} When a tool call is not approved, do not retry it.`,
+    // Ask for thought summaries so the chat can show them in its collapsible "thinking" section.
+    providerOptions: { google: { thinkingConfig: { includeThoughts: true } } },
     messages: pruneMessages({
+      // Thought summaries are for the person reading, so earlier ones are not sent back to the model.
+      reasoning: "before-last-message",
       // Old tool calls and their (possibly big) results are not re-sent to the model every turn.
       messages: await convertToModelMessages(withTurnContexts(denyUnansweredApprovals(history)), {
         ignoreIncompleteToolCalls: true,
@@ -139,6 +169,9 @@ export async function POST(req: Request) {
     toolApproval: getToolApproval(tools, allowedTools),
     // Building a trip means many tool calls in a row.
     stopWhen: isStepCount(10),
+    // Every step re-sends the system prompt, tool declarations and all earlier steps' tool results,
+    // so a long tool chain multiplies input tokens. One log line per step shows where they go.
+    onStepEnd: (step) => logStepUsage(threadId, modelId, step),
     onFinish: ({ totalUsage }) =>
       recordUsage({
         threadId,
