@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { generateText, type UIMessage } from "ai";
 import { getChatModel, getChatModelId } from "@/lib/models";
 import { listUIMessages, toUIMessage, updateThread } from "@/lib/threads";
 import { recordUsage } from "@/lib/usage";
@@ -9,11 +9,17 @@ type Ctx = { params: Promise<{ id: string }> };
 /** Names a conversation from its opening messages (read from the database), and saves the name. */
 export async function POST(_req: Request, { params }: Ctx) {
   const { id } = await params;
-  const rows = (await listUIMessages(id)).map(toUIMessage);
-  const textOf = (m: (typeof rows)[number]) =>
-    m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join(" ").trim();
-  // Name it from the opening exchange: the first question, and the reply that follows it if it has words.
-  const question = rows.find((m) => m.role === "user" && textOf(m));
+  const textOf = (m: UIMessage) => m.parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join(" ").trim();
+  // The browser asks for a name as soon as the first turn starts, which can be before the server has
+  // saved the first message. Wait for it (briefly) rather than naming an empty conversation.
+  let rows: UIMessage[] = [];
+  let question: UIMessage | undefined;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    rows = (await listUIMessages(id)).map(toUIMessage);
+    question = rows.find((m) => m.role === "user" && textOf(m));
+    if (question) break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
   if (!question) {
     // Nothing to name it from. Never ask the model anyway: with no input it invents an unrelated topic.
     return Response.json({ title: null });
