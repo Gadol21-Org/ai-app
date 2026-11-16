@@ -80,6 +80,11 @@ export function denyUnansweredApprovals(messages: UIMessage[]): UIMessage[] {
   })) as UIMessage[];
 }
 
+/** Model thoughts are never shown or saved, so they are removed from a reply before it is stored. */
+export function dropReasoning(message: UIMessage): UIMessage {
+  return { ...message, parts: message.parts.filter((p) => p.type !== "reasoning") };
+}
+
 /**
  * A reply that was cut short (the person pressed Stop, the connection dropped, or the model
  * failed) is saved as far as it got, tidied so it can be sent to the model again: text is closed,
@@ -88,7 +93,8 @@ export function denyUnansweredApprovals(messages: UIMessage[]): UIMessage[] {
  */
 export function settlePartialReply(message: UIMessage): UIMessage | undefined {
   const parts = message.parts.flatMap((part) => {
-    if ((part.type === "text" || part.type === "reasoning") && part.state === "streaming") return [{ ...part, state: "done" as const }];
+    if (part.type === "reasoning") return [];
+    if (part.type === "text" && part.state === "streaming") return [{ ...part, state: "done" as const }];
     if ("state" in part && "toolCallId" in part) {
       if (part.state === "input-streaming") return [];
       if (part.state === "input-available")
