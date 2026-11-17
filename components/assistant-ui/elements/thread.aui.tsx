@@ -9,13 +9,6 @@ import { File, getFileHref } from "@/components/assistant-ui/elements/file";
 import { ThreadFollowupSuggestions } from "@/components/assistant-ui/elements/follow-up-suggestions.aui";
 import { Image } from "@/components/assistant-ui/elements/image";
 import { MarkdownText } from "@/components/assistant-ui/elements/markdown-text";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningRoot,
-  ReasoningText,
-  ReasoningTrigger,
-} from "@/components/assistant-ui/elements/reasoning.aui";
 import { ToolFallback } from "@/components/assistant-ui/elements/tool-fallback.aui";
 import {
   ToolGroupContent,
@@ -110,11 +103,6 @@ const DefaultToolGroup: FC<PropsWithChildren<{ group: ThreadGroupPart }>> = ({
 const shouldShowComposerResume = (s: AssistantState) =>
   !!s.thread.canResume && s.composer.type === "thread" && s.composer.isEmpty;
 
-const reasoningDuration = (timing: ThreadGroupPart["timing"]) =>
-  timing?.completedAt === undefined
-    ? undefined
-    : Math.round((timing.completedAt - timing.startedAt) / 1000);
-
 /**
  * Optional component overrides for the thread. `AssistantMessage` and
  * `Welcome` replace whole sections; the remaining slots override how the
@@ -133,15 +121,11 @@ export type ThreadComponents = {
   ToolGroup?:
     | ComponentType<PropsWithChildren<{ group: ThreadGroupPart }>>
     | undefined;
-  ReasoningGroup?:
-    | ComponentType<PropsWithChildren<{ group: ThreadGroupPart }>>
-    | undefined;
   TaskGroup?: ComponentType<{ group: ThreadGroupPart }> | undefined;
   ComposerExtra?: ComponentType | undefined;
 };
 
 const messageGroupBy = groupPartByType({
-  reasoning: ["group-chainOfThought", "group-reasoning"],
   // A chart is the answer itself, so it sits in the message instead of inside the collapsed tool group.
   "tool-call:render_chart": [],
   "tool-call:present": [],
@@ -151,7 +135,6 @@ const messageGroupBy = groupPartByType({
 
 type ThreadGroupKey =
   | "group-chainOfThought"
-  | "group-reasoning"
   | "group-tool"
   | "group-task";
 
@@ -598,7 +581,6 @@ const AssistantMessage: FC = () => {
   const {
     ToolFallback: ToolFallbackComponent = ToolFallback,
     ToolGroup,
-    ReasoningGroup,
     TaskGroup: TaskGroupComponent,
   } = useContext(ThreadComponentsContext);
   const groupBy = TaskGroupComponent ? taskAwareGroupBy : messageGroupBy;
@@ -633,29 +615,11 @@ const AssistantMessage: FC = () => {
                 return (
                   <DefaultToolGroup group={part}>{children}</DefaultToolGroup>
                 );
-              case "group-reasoning": {
-                if (ReasoningGroup) {
-                  return (
-                    <ReasoningGroup group={part}>{children}</ReasoningGroup>
-                  );
-                }
-                const running = part.status.type === "running";
-                return (
-                  <ReasoningRoot streaming={running}>
-                    <ReasoningTrigger
-                      active={running}
-                      duration={reasoningDuration(part.timing)}
-                    />
-                    <ReasoningContent aria-busy={running}>
-                      <ReasoningText>{children}</ReasoningText>
-                    </ReasoningContent>
-                  </ReasoningRoot>
-                );
-              }
               case "text":
                 return <MarkdownText />;
               case "reasoning":
-                return <Reasoning {...part} />;
+                // Model thoughts are not shown (older saved replies may still hold some).
+                return null;
               case "tool-call":
                 return part.toolUI ?? <ToolFallbackComponent {...part} />;
               case "data":

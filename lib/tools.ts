@@ -1,7 +1,6 @@
 import "server-only";
 import { jsonSchema, tool, type ToolSet } from "ai";
-import { buildPresentParameters } from "@assistant-ui/generative-ui/react";
-import { schemaOnlyVocabulary } from "@/lib/generative-ui-vocabulary";
+import { presentParameters } from "@/lib/generative-ui-vocabulary";
 import { z } from "zod";
 import { createSchedule, deleteSchedule, getSchedule, listSchedules } from "@/lib/schedules/store";
 import { t } from "@/lib/i18n";
@@ -198,15 +197,11 @@ const renderChartTool = tool({
 
 const presentTool = tool({
   description:
-    "Show a composed answer: a layout of cards, facts (a label with a big number and its change), short text, tables and charts, drawn in the chat. " +
-    "Use it when the answer is a small report, such as a summary with key numbers, a comparison, or a chart together with the facts around it. " +
-    "Use render_chart instead when a single chart is all that is needed, and plain text for everything else. " +
-    "Every node picks a component with `_type` and nests others under `children`; wrap several top-level pieces in one Col. " +
-    "Put DataChart inside a Card whose title names it. Use real numbers from your tools, then add one or two sentences of insight after the call. " +
-    "Write all visible text in Hebrew unless the user used another language.",
-  inputSchema: jsonSchema<Record<string, unknown>>(
-    buildPresentParameters(schemaOnlyVocabulary()),
-  ),
+    "Show a small report in the chat: cards, facts (a label with a big number and its change), text, tables and charts. " +
+    "Use it for a summary with key numbers, a comparison, or a chart with facts around it; use render_chart for a lone chart and plain text otherwise. " +
+    "Each node has a `_type` and nests others under `children`; wrap several top-level pieces in one Col, and put a DataChart in a Card. " +
+    "Use real numbers from your tools, then add a sentence or two of insight. Write visible text in Hebrew unless the user used another language.",
+  inputSchema: jsonSchema<Record<string, unknown>>(presentParameters),
   execute: async () => ({ shown: true as const }),
 });
 

@@ -45,7 +45,6 @@ export const t = {
     update: "עדכון",
     previous: "הקודם",
     next: "הבא",
-    reasoning: "חשיבה",
     toolCalls: (n: number) => (n === 1 ? "קריאת כלי אחת" : `${n} קריאות כלי`),
     copyCode: "העתקה",
   },
