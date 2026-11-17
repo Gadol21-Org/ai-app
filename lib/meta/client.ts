@@ -111,3 +111,26 @@ export async function createPausedVideoAd(input: VideoAdInput): Promise<{ creati
   });
   return { creativeId: creative.id, adId: ad.id };
 }
+
+/** Names of Meta objects (campaigns, ad sets, ads, Pages, ...) by id, for showing people instead of ids. */
+export async function getObjectNames(ids: string[]): Promise<Record<string, string>> {
+  if (ids.length === 0) return {};
+  type Batch = Record<string, { name?: string } | undefined>;
+  const names: Record<string, string> = {};
+  const collect = (batch: Batch) => {
+    for (const [id, obj] of Object.entries(batch)) if (obj?.name) names[id] = obj.name;
+  };
+  try {
+    collect(await call<Batch>(`/?ids=${ids.map(encodeURIComponent).join(",")}&fields=name`));
+  } catch {
+    // One id the token can't read fails the whole batch, so fall back to one request each.
+    await Promise.all(
+      ids.map(async (id) => {
+        try {
+          collect(await call<Batch>(`/?ids=${encodeURIComponent(id)}&fields=name`));
+        } catch {}
+      }),
+    );
+  }
+  return names;
+}

@@ -1,10 +1,10 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { ShieldAlertIcon, ShieldQuestionIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
-import { describeToolCall, fieldsOf, type Field, type FieldValue } from "@/lib/approval-view";
+import { describeToolCall, fieldsOf, nameLookupIds, type Field, type FieldValue } from "@/lib/approval-view";
 
 function Value({ value }: { value: FieldValue }) {
   switch (value.kind) {
@@ -70,6 +70,36 @@ export function FieldList({ fields, nested }: { fields: Field[]; nested?: boolea
   );
 }
 
+const nameCache = new Map<string, Record<string, string>>();
+
+/** The names behind the ids in a Meta call (campaign, ad set, Page, ...), looked up on the server; ids until they arrive. */
+function useNames(toolName: string, args: unknown) {
+  const { meta, media } = nameLookupIds(toolName, args);
+  const query = new URLSearchParams();
+  if (meta.length) query.set("meta", meta.join(","));
+  if (media.length) query.set("media", media.join(","));
+  const key = query.toString();
+  const [names, setNames] = useState<Record<string, string>>(() => nameCache.get(key) ?? {});
+  useEffect(() => {
+    if (!key) return;
+    const cached = nameCache.get(key);
+    if (cached) return setNames(cached);
+    let cancelled = false;
+    fetch(`/api/meta/names?${key}`, { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { names?: Record<string, string> } | null) => {
+        if (!data?.names) return;
+        nameCache.set(key, data.names);
+        if (!cancelled) setNames(data.names);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  return names;
+}
+
 /** What a tool call is about to do (or did), as labeled fields; the raw JSON stays one tap away. */
 export function ToolCallDetails({ toolName, args, argsText }: { toolName: string; args?: unknown; argsText?: string }) {
   let parsed = args;
@@ -78,7 +108,8 @@ export function ToolCallDetails({ toolName, args, argsText }: { toolName: string
       parsed = JSON.parse(argsText);
     } catch {}
   }
-  const view = describeToolCall(toolName, parsed);
+  const names = useNames(toolName, parsed);
+  const view = describeToolCall(toolName, parsed, names);
   const hasContent = view.highlights.length > 0 || view.fields.length > 0;
   return (
     <div data-slot="tool-call-details" className="flex flex-col gap-2.5">

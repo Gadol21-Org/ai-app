@@ -127,12 +127,33 @@ export function valueText(value: FieldValue): string {
 type Tailored = Pick<ApprovalView, "highlights"> & { omit: string[]; caution?: string | null; note?: string };
 
 /** Pulls the first present key of each group into a labeled highlight and hides those keys from the field list. */
-function pickHighlights(args: Record<string, unknown>, groups: Array<[label: string, ...keys: string[]]>) {
+type Names = Record<string, string>;
+
+/** Argument keys whose value is an id that the card shows as a name when one is known. */
+const NAMED_ID_KEYS = new Set([
+  "entity_id", "entityId", "id", "campaign_id", "campaignId", "adset_id", "ad_set_id", "adSetId", "pageId", "page_id", "mediaId",
+]);
+
+/** The ids of a tailored call that a person would rather see as names (the card asks the server for them). */
+export function nameLookupIds(toolName: string, args: unknown): { meta: string[]; media: string[] } {
+  const none = { meta: [], media: [] };
+  if (!Object.hasOwn(tailored, toolName) || !args || typeof args !== "object") return none;
+  const meta: string[] = [];
+  const media: string[] = [];
+  for (const [key, value] of Object.entries(args as Record<string, unknown>)) {
+    if (!NAMED_ID_KEYS.has(key) || (typeof value !== "string" && typeof value !== "number")) continue;
+    (key === "mediaId" ? media : meta).push(String(value));
+  }
+  return { meta, media };
+}
+
+function pickHighlights(args: Record<string, unknown>, groups: Array<[label: string, ...keys: string[]]>, names: Names = {}) {
   const highlights: ApprovalView["highlights"] = [];
   const omit: string[] = [];
   for (const [label, ...keys] of groups) {
     for (const key of keys) {
-      const value = toFieldValue(key, args[key]);
+      const named = NAMED_ID_KEYS.has(key) ? names[String(args[key])] : undefined;
+      const value: FieldValue | null = named ? { kind: "text", text: named } : toFieldValue(key, args[key]);
       if (!value) continue;
       highlights.push({ label, value });
       omit.push(...keys);
@@ -154,33 +175,33 @@ const DATES: Array<[string, ...string[]]> = [
   [m.ends, "end_time", "endTime", "end_date", "endDate"],
 ];
 
-const tailored: Record<string, (args: Record<string, unknown>) => Tailored> = {
-  ads_create_campaign: (a) => ({
-    ...pickHighlights(a, [[m.name, "name"], [m.objective, "objective"], BUDGET, ...DATES]),
+const tailored: Record<string, (args: Record<string, unknown>, names: Names) => Tailored> = {
+  ads_create_campaign: (a, n) => ({
+    ...pickHighlights(a, [[m.name, "name"], [m.objective, "objective"], BUDGET, ...DATES], n),
     note: m.createdPaused,
   }),
-  ads_create_ad_set: (a) => ({
-    ...pickHighlights(a, [[m.name, "name"], [m.campaign, "campaign_id", "campaignId"], BUDGET, [m.audience, "targeting", "audience"], ...DATES, [m.goal, "optimization_goal", "optimizationGoal"]]),
+  ads_create_ad_set: (a, n) => ({
+    ...pickHighlights(a, [[m.name, "name"], [m.campaign, "campaign_id", "campaignId"], BUDGET, [m.audience, "targeting", "audience"], ...DATES, [m.goal, "optimization_goal", "optimizationGoal"]], n),
     note: m.createdPaused,
   }),
-  ads_create_ad: (a) => ({
-    ...pickHighlights(a, [[m.name, "name"], [m.adSet, "adset_id", "ad_set_id", "adSetId"], [m.headline, "headline", "title"], [m.text, "message", "body", "primary_text"], [m.destination, "link", "link_url", "url", "website_url"]]),
+  ads_create_ad: (a, n) => ({
+    ...pickHighlights(a, [[m.name, "name"], [m.adSet, "adset_id", "ad_set_id", "adSetId"], [m.headline, "headline", "title"], [m.text, "message", "body", "primary_text"], [m.destination, "link", "link_url", "url", "website_url"]], n),
     note: m.createdPaused,
   }),
-  ads_update_entity: (a) => ({
-    ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.name, "name"], BUDGET, [m.status, "status"], ...DATES]),
+  ads_update_entity: (a, n) => ({
+    ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.name, "name"], BUDGET, [m.status, "status"], ...DATES], n),
     caution: spends(a) || goesLive(a) ? m.changeCaution : null,
   }),
-  ads_activate_entity: (a) => ({
-    ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.entityType, "entity_type", "entityType", "type"]]),
+  ads_activate_entity: (a, n) => ({
+    ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.entityType, "entity_type", "entityType", "type"]], n),
     caution: m.activateCaution,
   }),
-  ads_catalog_create: (a) => pickHighlights(a, [[m.name, "name"]]),
-  upload_ad_video: (a) => ({
-    ...pickHighlights(a, [[m.title, "title"], [m.mediaId, "mediaId"]]),
+  ads_catalog_create: (a, n) => pickHighlights(a, [[m.name, "name"]], n),
+  upload_ad_video: (a, n) => ({
+    ...pickHighlights(a, [[m.title, "title"], [m.mediaId, "mediaId"]], n),
     note: m.uploadNote,
   }),
-  create_video_ad: (a) => ({
+  create_video_ad: (a, n) => ({
     ...pickHighlights(a, [
       [m.name, "name"],
       [m.adSet, "adSetId"],
@@ -189,7 +210,7 @@ const tailored: Record<string, (args: Record<string, unknown>) => Tailored> = {
       [m.headline, "headline"],
       [m.destination, "linkUrl"],
       [m.button, "callToAction"],
-    ]),
+    ], n),
     note: m.createdPaused,
   }),
   fetch_url: (args) => {
@@ -209,9 +230,9 @@ const tailored: Record<string, (args: Record<string, unknown>) => Tailored> = {
   },
 };
 
-export function describeToolCall(toolName: string, args: unknown): ApprovalView {
+export function describeToolCall(toolName: string, args: unknown, names: Names = {}): ApprovalView {
   const record = args && typeof args === "object" && !Array.isArray(args) ? (args as Record<string, unknown>) : {};
-  const custom = Object.hasOwn(tailored, toolName) ? tailored[toolName]!(record) : undefined;
+  const custom = Object.hasOwn(tailored, toolName) ? tailored[toolName]!(record, names) : undefined;
   if (custom?.note) custom.highlights.push({ label: "", value: { kind: "text", text: custom.note } });
   const rest = custom ? Object.fromEntries(Object.entries(record).filter(([k]) => !custom.omit.includes(k))) : record;
   return {
