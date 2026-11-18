@@ -74,6 +74,17 @@ const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0 
 const MAX_CHAT_STEPS = 40;
 
 export async function POST(req: Request) {
+  try {
+    return await handleChat(req);
+  } catch (error) {
+    // Otherwise Next answers with an empty 500 and the browser can only say "Failed to fetch the chat
+    // response." Log the cause, and send it so the chat shows it.
+    console.error("chat request failed:", error);
+    return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
+}
+
+async function handleChat(req: Request) {
   const user = await getCurrentUser();
   if (!user) return unauthorized();
   const body: ChatRequest = await req.json();
