@@ -2,7 +2,7 @@ import { createMCPClient, type MCPClient } from "@ai-sdk/mcp";
 import { StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import type { ToolSet } from "ai";
+import { asSchema, jsonSchema, type JSONSchema7, type ToolSet } from "ai";
 import { t } from "@/lib/i18n";
 
 /**
@@ -52,6 +52,11 @@ export type McpServerConfig = (
   maxResultChars?: number;
   /** Shorter replacement descriptions by tool name (a long description is paid for on every step). */
   toolDescriptions?: Record<string, string>;
+  /**
+   * Shorter descriptions for the tools' arguments, by argument name (applied to every tool of the
+   * server that has that argument). An empty string removes the description, for names that explain themselves.
+   */
+  paramDescriptions?: Record<string, string>;
 };
 
 /** Tool results longer than this are cut before they reach the chat, the DB or the model. */
@@ -99,6 +104,38 @@ const WANDERLOG_DESCRIPTIONS: Record<string, string> = {
   wanderlog_rename_day: "Set the heading of one day (an empty heading resets it).",
 };
 
+/** Argument descriptions repeat on every tool ("The trip to add to. Use wanderlog_list_trips ..."); these are the short forms. */
+const WANDERLOG_PARAM_DESCRIPTIONS: Record<string, string> = {
+  trip_key: "From wanderlog_list_trips.",
+  day: "'day 2', 'May 4' or YYYY-MM-DD. Omit for the Places to visit list.",
+  response_format: "'concise' (default) or 'detailed'.",
+  place: "Place name or reference (e.g. 'Sensō-ji', 'the hotel').",
+  place_ref: "Place name or reference, e.g. 'the hotel', '2nd Gardens', 'Gardens on day 3'.",
+  hotel: "Hotel name.",
+  note: "Short practical note (transit, booking tips).",
+  start_time: "HH:mm.",
+  end_time: "HH:mm.",
+  query: "",
+  text: "",
+  items: "",
+  title: "",
+  heading: "",
+  destination: "",
+  start_date: "YYYY-MM-DD.",
+  end_date: "YYYY-MM-DD.",
+  check_in: "YYYY-MM-DD.",
+  check_out: "YYYY-MM-DD.",
+  old_text: "",
+  new_text: "",
+  privacy: "",
+  amount: "",
+  category: "",
+  description: "",
+  date: "YYYY-MM-DD.",
+  currency: "ISO code; default USD.",
+  force: "Allow removing days that have content.",
+};
+
 function wanderlogServer(): McpServerConfig | undefined {
   const cookie = process.env.WANDERLOG_COOKIE?.trim();
   if (!cookie) return undefined;
@@ -121,6 +158,7 @@ function wanderlogServer(): McpServerConfig | undefined {
     allowTools: ["wanderlog_get_*", "wanderlog_list_*", "wanderlog_search_*"],
     hideTools: WANDERLOG_HIDDEN_TOOLS,
     toolDescriptions: WANDERLOG_DESCRIPTIONS,
+    paramDescriptions: WANDERLOG_PARAM_DESCRIPTIONS,
   };
 }
 
@@ -199,7 +237,25 @@ export function resultToText(result: unknown): string {
   );
 }
 
-/** Drops the server's `hideTools` and swaps in its shorter `toolDescriptions`. */
+/** Copy of an input schema with its arguments' descriptions replaced (or dropped, for ""). */
+function withParamDescriptions(tool: ToolSet[string], overrides: Record<string, string>): ToolSet[string] {
+  const original = asSchema(tool.inputSchema as never);
+  const schema = jsonSchema(
+    async () => {
+      const copy = structuredClone(await original.jsonSchema) as JSONSchema7;
+      for (const [name, prop] of Object.entries(copy.properties ?? {})) {
+        if (!(name in overrides) || typeof prop !== "object") continue;
+        if (overrides[name]) prop.description = overrides[name];
+        else delete prop.description;
+      }
+      return copy;
+    },
+    { validate: original.validate },
+  );
+  return { ...tool, inputSchema: schema } as typeof tool;
+}
+
+/** Drops the server's `hideTools`, swaps in its shorter `toolDescriptions` and `paramDescriptions`. */
 function adjustTools(tools: ToolSet, config: McpServerConfig): ToolSet {
   const hidden = Array.isArray(config.hideTools) ? config.hideTools : [];
   const descriptions = config.toolDescriptions ?? {};
@@ -207,7 +263,9 @@ function adjustTools(tools: ToolSet, config: McpServerConfig): ToolSet {
   for (const [name, tool] of Object.entries(tools)) {
     if (hidden.some((pattern) => typeof pattern === "string" && matchesToolPattern(name, pattern))) continue;
     const description = descriptions[name];
-    adjusted[name] = description ? ({ ...tool, description } as typeof tool) : tool;
+    let next = description ? ({ ...tool, description } as typeof tool) : tool;
+    if (config.paramDescriptions) next = withParamDescriptions(next, config.paramDescriptions);
+    adjusted[name] = next;
   }
   return adjusted;
 }
