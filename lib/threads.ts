@@ -1,6 +1,6 @@
 import "server-only";
 import type { UIMessage } from "ai";
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
 const { threads, messages } = schema;
@@ -64,16 +64,19 @@ export async function deleteThread(id: string) {
 export async function listMessages(threadId: string, format: string) {
   const rows = await getDb()
     .select({
+      seq: messages.seq,
       id: messages.id,
       parent_id: messages.parentId,
       format: messages.format,
       content: messages.content,
     })
     .from(messages)
-    .where(and(eq(messages.threadId, threadId), eq(messages.format, format)))
-    .orderBy(asc(messages.seq));
+    .where(and(eq(messages.threadId, threadId), eq(messages.format, format)));
+  // Sorted here, not with ORDER BY: MySQL sorts whole rows, and a thread whose rows hold big tool
+  // results can overflow the server's sort buffer ("Out of sort memory"), which failed every chat.
+  rows.sort((a, b) => a.seq - b.seq);
   // MariaDB returns JSON columns as text; MySQL returns them parsed.
-  return rows.map((r) => ({
+  return rows.map(({ seq: _seq, ...r }) => ({
     ...r,
     content: typeof r.content === "string" ? JSON.parse(r.content) : r.content,
   })) as StoredMessage[];
