@@ -136,6 +136,7 @@ That endpoint has **no login**, so it is only reachable on the VM's Docker netwo
 - Reading (`list_transactions`, `get_transaction`, `list_operations_log`, `list_categories`, `list_payment_methods`)
   runs without asking. `create_transaction`, `update_transaction` and `delete_transaction` show the approval card first.
   Changes are logged in the budget app as made by `mcp`. Scheduled runs don't get MCP tools.
+- Its results may be up to 40000 characters (other servers: `MCP_MAX_RESULT_CHARS`), because a page of 100 transactions is long; the model is told to ask for `limit` 100 and narrow by date.
 - If the budget app is down the tools are simply missing (`[mcp] budget unavailable` in the log) and the next message retries.
 
 ### Wanderlog

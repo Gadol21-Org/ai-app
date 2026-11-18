@@ -44,6 +44,12 @@ export type McpServerConfig = (
    * step, so tools nobody uses only cost tokens.
    */
   hideTools?: string[];
+  /**
+   * Cut tool results at this many characters instead of `MCP_MAX_RESULT_CHARS`. A server whose records are
+   * verbose (the budget tracker's transactions) needs more, or a page is cut mid-way and the model
+   * answers by asking for smaller and smaller pages.
+   */
+  maxResultChars?: number;
   /** Shorter replacement descriptions by tool name (a long description is paid for on every step). */
   toolDescriptions?: Record<string, string>;
 };
@@ -147,6 +153,8 @@ function budgetServer(): McpServerConfig | undefined {
     url,
     // The read-only tools (get/list) run without asking; create/update/delete still ask.
     allowTools: ["get_transaction", "list_*"],
+    // 100 transactions with all their metadata are about 40k characters; 8000 cut a page after ~20.
+    maxResultChars: 40000,
   };
 }
 
@@ -221,7 +229,7 @@ function adjustTools(tools: ToolSet, config: McpServerConfig): ToolSet {
   return adjusted;
 }
 
-function limitResults(tools: ToolSet): ToolSet {
+function limitResults(tools: ToolSet, max = MAX_TOOL_RESULT_CHARS): ToolSet {
   const wrapped: ToolSet = {};
   for (const [name, tool] of Object.entries(tools)) {
     const execute = tool.execute;
@@ -233,7 +241,7 @@ function limitResults(tools: ToolSet): ToolSet {
       ...tool,
       execute: async (...args: Parameters<typeof execute>) => {
         const result = await execute(...args);
-        const text = truncate(resultToText(result));
+        const text = truncate(resultToText(result), max);
         // Thrown, so the chat shows it as a failed call instead of a result.
         if ((result as McpResult)?.isError) throw new Error(text);
         return text;
@@ -308,6 +316,7 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
       try {
         const tools = limitResults(
           adjustTools(await client.tools(), config),
+          config.maxResultChars,
         ) as ToolSet;
         for (const toolName of Object.keys(tools)) {
           if (needsApproval(toolName, config))
@@ -326,13 +335,28 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
   return pending;
 }
 
+/** A server that has not answered by then is skipped for this message, so it cannot hang the chat. */
+const MCP_LOAD_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no answer in ${MCP_LOAD_TIMEOUT_MS / 1000}s`)), MCP_LOAD_TIMEOUT_MS);
+    promise.then(
+      (value) => (clearTimeout(timer), resolve(value)),
+      (error) => (clearTimeout(timer), reject(error)),
+    );
+    // The connection attempt keeps going and is reused by the next message if it finishes.
+    promise.catch(() => {});
+  });
+}
+
 /** Tools from every configured MCP server, or `{}` when none are configured or reachable. */
 export async function getMcpTools(): Promise<ToolSet> {
   const entries = Object.entries(getMcpServers());
   const results = await Promise.all(
     entries.map(async ([name, config]) => {
       try {
-        return (await load(name, config)).tools;
+        return (await withTimeout(load(name, config))).tools;
       } catch (error) {
         console.error(
           `[mcp] ${name} unavailable:`,
