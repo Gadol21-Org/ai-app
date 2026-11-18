@@ -534,6 +534,14 @@ export const t = {
     wanderlog_edit_journal: "עריכת רשומת יומן",
     wanderlog_remove_journal: "הסרת רשומת יומן",
     wanderlog_list_journal: "רשימת רשומות יומן",
+    list_transactions: "רשימת תנועות",
+    get_transaction: "פרטי תנועה",
+    create_transaction: "הוספת תנועה",
+    update_transaction: "עדכון תנועה",
+    delete_transaction: "מחיקת תנועה",
+    list_operations_log: "יומן שינויים",
+    list_categories: "רשימת קטגוריות",
+    list_payment_methods: "רשימת אמצעי תשלום",
   } as Record<string, string>,
 
   mediaLibrary: {

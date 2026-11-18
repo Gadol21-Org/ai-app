@@ -134,6 +134,22 @@ function metaAdsServer(): McpServerConfig | undefined {
   };
 }
 
+/**
+ * The family budget tracker (github.com/Gadol21-Org/budget-tracking), which serves MCP over stateless
+ * Streamable HTTP at `/mcp` with no login of its own: it is only reachable from containers on the VM's
+ * `budget-internal` Docker network (deploy.sh attaches this app to it and sets this variable to
+ * `http://budget-tracking:3000/mcp`). Off when the variable is unset.
+ */
+function budgetServer(): McpServerConfig | undefined {
+  const url = process.env.BUDGET_MCP_URL?.trim();
+  if (!url) return undefined;
+  return {
+    url,
+    // The read-only tools (get/list) run without asking; create/update/delete still ask.
+    allowTools: ["get_transaction", "list_*"],
+  };
+}
+
 function parseExtraServers(): Record<string, McpServerConfig> {
   const raw = process.env.MCP_SERVERS?.trim();
   if (!raw) return {};
@@ -150,6 +166,7 @@ export function getMcpServers(): Record<string, McpServerConfig> {
   const servers: Record<string, McpServerConfig | undefined> = {
     wanderlog: wanderlogServer(),
     meta_ads: metaAdsServer(),
+    budget: budgetServer(),
     ...parseExtraServers(),
   };
   return Object.fromEntries(

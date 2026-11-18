@@ -101,6 +101,7 @@ the variables below set the app starts normally and just has no extra tools. A s
 | Variable | Meaning |
 |---|---|
 | `WANDERLOG_COOKIE` | Enables the Wanderlog tools (trips, places, notes, hotels, checklists, expenses). The value of the `connect.sid` cookie of a logged-in session on wanderlog.com. |
+| `BUDGET_MCP_URL` | Enables the budget tracker tools (transactions, categories, payment methods, change log). `deploy.sh` sets it to `http://budget-tracking:3000/mcp` on the VM; leave it unset locally to disable. See [Budget tracker](#budget-tracker). |
 | `MCP_SERVERS` | Optional JSON for more servers, one line: `{"name":{"url":"https://host/mcp","headers":{"Authorization":"Bearer ..."}}}` for a remote server, or `{"name":{"command":"node","args":["server.js"],"env":{"KEY":"value"}}}` for a local process. |
 | `MCP_SERVERS` approval | Every MCP tool asks for approval by default. Each server in `MCP_SERVERS` may add `"allowTools"`, a list of tool names that run without asking (`*` matches any characters, e.g. `["notes_get_*","notes_list_*","notes_search"]`), and/or `"requireApproval"`: `"all"` (default), `"none"`, or a list of regexes of the tools that ask. A name in `allowTools` always wins. See [MCP approvals](#mcp-approvals). |
 | `MCP_MAX_RESULT_CHARS` | Tool results longer than this (default `8000`) are truncated before they reach the chat, the database and the model. |
@@ -123,6 +124,19 @@ safe tools, list them per server in `allowTools`, so only the risky ones keep as
   without asking for the rest of that conversation. It is saved with the conversation (so it survives a reload),
   applies only to that tool, and does not affect other conversations.
 - Scheduled runs never get MCP tools, whatever the allow list says.
+
+### Budget tracker
+
+The family's income and expenses live in [budget-tracking](https://github.com/Gadol21-Org/budget-tracking), which
+serves an MCP endpoint (`POST /mcp`, stateless Streamable HTTP, [its docs](https://github.com/Gadol21-Org/budget-tracking/blob/main/deploy/MCP.md)).
+That endpoint has **no login**, so it is only reachable on the VM's Docker network `budget-internal`.
+
+- `deploy/deploy.sh` creates that network if needed, attaches the `ai-app` container to it and sets
+  `BUDGET_MCP_URL=http://budget-tracking:3000/mcp` (the other container's name and its own port, not `127.0.0.1:8082`).
+- Reading (`list_transactions`, `get_transaction`, `list_operations_log`, `list_categories`, `list_payment_methods`)
+  runs without asking. `create_transaction`, `update_transaction` and `delete_transaction` show the approval card first.
+  Changes are logged in the budget app as made by `mcp`. Scheduled runs don't get MCP tools.
+- If the budget app is down the tools are simply missing (`[mcp] budget unavailable` in the log) and the next message retries.
 
 ### Wanderlog
 
