@@ -3,6 +3,7 @@ import { StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { ToolSet } from "ai";
+import { compactBudgetResult } from "@/lib/budget-format";
 import { t } from "@/lib/i18n";
 
 /**
@@ -50,6 +51,11 @@ export type McpServerConfig = (
    * answers by asking for smaller and smaller pages.
    */
   maxResultChars?: number;
+  /**
+   * Rewrites a tool's result text before it is cut and shown (a shorter form of the same data).
+   * Return `undefined` to keep the original.
+   */
+  formatResult?: (toolName: string, text: string) => string | undefined;
   /** Shorter replacement descriptions by tool name (a long description is paid for on every step). */
   toolDescriptions?: Record<string, string>;
 };
@@ -68,7 +74,11 @@ const MCP_SERVERS_DIR =
  * `connect.sid` session cookie.
  */
 /** Guides and the trip link are not used by the family. */
-const WANDERLOG_HIDDEN_TOOLS = ["wanderlog_search_guides", "wanderlog_get_guide", "wanderlog_get_trip_url"];
+const WANDERLOG_HIDDEN_TOOLS = [
+  "wanderlog_search_guides",
+  "wanderlog_get_guide",
+  "wanderlog_get_trip_url",
+];
 
 /**
  * The package's own descriptions run to several paragraphs of itinerary-writing advice, which would
@@ -76,27 +86,34 @@ const WANDERLOG_HIDDEN_TOOLS = ["wanderlog_search_guides", "wanderlog_get_guide"
  * their own descriptions.
  */
 const WANDERLOG_DESCRIPTIONS: Record<string, string> = {
-  wanderlog_list_trips: "List the user's Wanderlog trips with title, dates and trip_key (the key the other tools need).",
+  wanderlog_list_trips:
+    "List the user's Wanderlog trips with title, dates and trip_key (the key the other tools need).",
   wanderlog_get_trip:
     "Get one trip's itinerary: hotels, places to visit and each day's places. Use 'concise' to summarize and 'detailed' for addresses, phone numbers and hotel dates. Needs trip_key (from list_trips).",
   wanderlog_search_places:
     "Search for restaurants, attractions, hotels and other places near a trip's destination. Returns candidates; use add_place to add one.",
-  wanderlog_create_trip: "Create an empty trip for a destination and date range, with one section per day.",
+  wanderlog_create_trip:
+    "Create an empty trip for a destination and date range, with one section per day.",
   wanderlog_add_place:
     "Add a place to a trip's day or its places-to-visit list. 'note' and start/end time can be set on the place itself.",
   wanderlog_add_hotel: "Add a hotel booking with check-in and check-out dates.",
-  wanderlog_add_note: "Add a free-standing text note between places on a day (use add_place's note for a note about one place).",
+  wanderlog_add_note:
+    "Add a free-standing text note between places on a day (use add_place's note for a note about one place).",
   wanderlog_add_checklist: "Add a checklist to the trip or to one day.",
-  wanderlog_annotate_place: "Set a note and/or start/end time on a place already in the trip.",
-  wanderlog_add_expense: "Add a budget expense linked to a place that is already in the trip.",
+  wanderlog_annotate_place:
+    "Set a note and/or start/end time on a place already in the trip.",
+  wanderlog_add_expense:
+    "Add a budget expense linked to a place that is already in the trip.",
   wanderlog_remove_place:
     "Remove a place, flight, train or hotel by name or reference (e.g. 'the hotel', 'Gardens on day 3', '2nd Gardens'). Asks which one if ambiguous.",
   wanderlog_edit_note:
     "Find and replace text in notes, place notes and checklist items. Case-insensitive; lists the matches if there are several.",
-  wanderlog_remove_note: "Delete a note by matching part of its text, optionally on one day.",
+  wanderlog_remove_note:
+    "Delete a note by matching part of its text, optionally on one day.",
   wanderlog_update_trip_dates:
     "Change a trip's date range. Refuses if days with content would be removed, unless force is true.",
-  wanderlog_rename_day: "Set the heading of one day (an empty heading resets it).",
+  wanderlog_rename_day:
+    "Set the heading of one day (an empty heading resets it).",
 };
 
 function wanderlogServer(): McpServerConfig | undefined {
@@ -139,6 +156,7 @@ function budgetServer(): McpServerConfig | undefined {
     allowTools: ["get_transaction", "list_*"],
     // 100 transactions with all their metadata are about 40k characters; 8000 cut a page after ~20.
     maxResultChars: 40000,
+    formatResult: compactBudgetResult,
   };
 }
 
@@ -205,14 +223,26 @@ function adjustTools(tools: ToolSet, config: McpServerConfig): ToolSet {
   const descriptions = config.toolDescriptions ?? {};
   const adjusted: ToolSet = {};
   for (const [name, tool] of Object.entries(tools)) {
-    if (hidden.some((pattern) => typeof pattern === "string" && matchesToolPattern(name, pattern))) continue;
+    if (
+      hidden.some(
+        (pattern) =>
+          typeof pattern === "string" && matchesToolPattern(name, pattern),
+      )
+    )
+      continue;
     const description = descriptions[name];
-    adjusted[name] = description ? ({ ...tool, description } as typeof tool) : tool;
+    adjusted[name] = description
+      ? ({ ...tool, description } as typeof tool)
+      : tool;
   }
   return adjusted;
 }
 
-function limitResults(tools: ToolSet, max = MAX_TOOL_RESULT_CHARS): ToolSet {
+function limitResults(
+  tools: ToolSet,
+  max = MAX_TOOL_RESULT_CHARS,
+  format?: McpServerConfig["formatResult"],
+): ToolSet {
   const wrapped: ToolSet = {};
   for (const [name, tool] of Object.entries(tools)) {
     const execute = tool.execute;
@@ -224,9 +254,11 @@ function limitResults(tools: ToolSet, max = MAX_TOOL_RESULT_CHARS): ToolSet {
       ...tool,
       execute: async (...args: Parameters<typeof execute>) => {
         const result = await execute(...args);
-        const text = truncate(resultToText(result), max);
+        const raw = resultToText(result);
+        const isError = (result as McpResult)?.isError;
+        const text = truncate((!isError && format?.(name, raw)) || raw, max);
         // Thrown, so the chat shows it as a failed call instead of a result.
-        if ((result as McpResult)?.isError) throw new Error(text);
+        if (isError) throw new Error(text);
         return text;
       },
     } as typeof tool;
@@ -277,7 +309,8 @@ export function needsApproval(
   if (
     Array.isArray(config.allowTools) &&
     config.allowTools.some(
-      (pattern) => typeof pattern === "string" && matchesToolPattern(toolName, pattern),
+      (pattern) =>
+        typeof pattern === "string" && matchesToolPattern(toolName, pattern),
     )
   )
     return false;
@@ -300,10 +333,10 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
         const tools = limitResults(
           adjustTools(await client.tools(), config),
           config.maxResultChars,
+          config.formatResult,
         ) as ToolSet;
         for (const toolName of Object.keys(tools)) {
-          if (needsApproval(toolName, config))
-            approvalRequired.add(toolName);
+          if (needsApproval(toolName, config)) approvalRequired.add(toolName);
         }
         return { client, tools };
       } catch (error) {
@@ -323,7 +356,10 @@ const MCP_LOAD_TIMEOUT_MS = 8000;
 
 function withTimeout<T>(promise: Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`no answer in ${MCP_LOAD_TIMEOUT_MS / 1000}s`)), MCP_LOAD_TIMEOUT_MS);
+    const timer = setTimeout(
+      () => reject(new Error(`no answer in ${MCP_LOAD_TIMEOUT_MS / 1000}s`)),
+      MCP_LOAD_TIMEOUT_MS,
+    );
     promise.then(
       (value) => (clearTimeout(timer), resolve(value)),
       (error) => (clearTimeout(timer), reject(error)),
