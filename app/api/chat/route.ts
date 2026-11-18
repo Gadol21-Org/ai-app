@@ -70,6 +70,9 @@ const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0 
  * saves the new user message (with its turn context) before calling the model, and saves the
  * reply when the stream ends, or as far as it got if the stream is cut short.
  */
+/** Most model steps (each may call tools) in one reply. */
+const MAX_CHAT_STEPS = 40;
+
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return unauthorized();
@@ -166,8 +169,11 @@ export async function POST(req: Request) {
     }),
     tools,
     toolApproval: getToolApproval(tools, allowedTools),
-    // Building a trip means many tool calls in a row.
-    stopWhen: isStepCount(10),
+    // Building a trip or going through a year of transactions means many tool calls in a row.
+    stopWhen: isStepCount(MAX_CHAT_STEPS),
+    // On the last step the tools are switched off, so the model answers with what it has and says what
+    // is missing, instead of the reply just ending after a tool result.
+    prepareStep: ({ stepNumber }) => (stepNumber === MAX_CHAT_STEPS - 1 ? { toolChoice: "none" } : undefined),
     // Every step re-sends the system prompt, tool declarations and all earlier steps' tool results,
     // so a long tool chain multiplies input tokens. One log line per step shows where they go.
     onStepEnd: (step) => logStepUsage(threadId, modelId, step),
