@@ -1288,9 +1288,6 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
     }
   }, [approval, isRequiresAction, status?.type]);
 
-  // A file the tool made (speech, image, video) is shown under the card, even while it is collapsed.
-  const media = toolName.startsWith("generate_") ? mediaOf(result) : undefined;
-
   // A call waiting for a decision is a card: what will happen as labeled fields, then Allow / Deny.
   if (
     approval != null &&
@@ -1311,6 +1308,9 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
         />
       </ApprovalCard>
     );
+
+  // A file the tool made (speech, image, video) is shown under the card, even while it is collapsed.
+  const media = toolName.startsWith("generate_") ? mediaOf(result) : undefined;
 
   return (
     <>

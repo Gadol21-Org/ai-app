@@ -20,8 +20,8 @@ export type ApprovalView = {
   title: string;
   /** The call removes or deletes something, so the card is drawn more cautiously. */
   destructive: boolean;
-  /** The call can spend money or change what is live; drawn in amber with this one-line warning. */
-  caution: string | null;
+  /** The call costs money or credits, or changes what is live: the card is drawn with a warning and says so. */
+  caution?: string;
   /** Short lines shown above the fields (what exactly will happen). */
   highlights: { label: string; value: FieldValue }[];
   fields: Field[];
@@ -124,7 +124,7 @@ export function valueText(value: FieldValue): string {
  * Tool-specific views. They pull the one or two fields that decide whether to allow the call into
  * `highlights` and leave the rest to the generic field list.
  */
-type Tailored = Pick<ApprovalView, "highlights"> & { omit: string[]; caution?: string | null; note?: string };
+type Tailored = Pick<ApprovalView, "highlights" | "caution"> & { omit: string[]; note?: string };
 
 /** Pulls the first present key of each group into a labeled highlight and hides those keys from the field list. */
 type Names = Record<string, string>;
@@ -175,6 +175,12 @@ const DATES: Array<[string, ...string[]]> = [
   [m.ends, "end_time", "endTime", "end_date", "endDate"],
 ];
 
+const str = (v: unknown) => (typeof v === "string" && v.trim() !== "" ? v.trim() : undefined);
+const text = (label: string, value: string, extra: { long?: boolean; ltr?: boolean } = {}) => ({
+  label,
+  value: { kind: "text" as const, text: value, ...extra },
+});
+
 const tailored: Record<string, (args: Record<string, unknown>, names: Names) => Tailored> = {
   ads_create_campaign: (a, n) => ({
     ...pickHighlights(a, [[m.name, "name"], [m.objective, "objective"], BUDGET, ...DATES], n),
@@ -190,7 +196,7 @@ const tailored: Record<string, (args: Record<string, unknown>, names: Names) => 
   }),
   ads_update_entity: (a, n) => ({
     ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.name, "name"], BUDGET, [m.status, "status"], ...DATES], n),
-    caution: spends(a) || goesLive(a) ? m.changeCaution : null,
+    caution: spends(a) || goesLive(a) ? m.changeCaution : undefined,
   }),
   ads_activate_entity: (a, n) => ({
     ...pickHighlights(a, [[m.entity, "entity_id", "entityId", "id"], [m.entityType, "entity_type", "entityType", "type"]], n),
@@ -213,6 +219,42 @@ const tailored: Record<string, (args: Record<string, unknown>, names: Names) => 
     ], n),
     note: m.createdPaused,
   }),
+  generate_speech: (args) => {
+    const m = t.approvalCard.media;
+    const script = str(args.script);
+    const highlights: ApprovalView["highlights"] = [];
+    if (script) highlights.push(text(m.script, script, { long: true }));
+    const voice = str(args.voiceId);
+    highlights.push(text(m.voice, voice ?? m.defaultVoice, voice ? { ltr: true } : {}));
+    const lang = str(args.languageCode);
+    if (lang) highlights.push(text(m.language, lang, { ltr: true }));
+    if (script) highlights.push(text(m.characters, formatNumber(script.length)));
+    return { highlights, omit: ["script", "voiceId", "languageCode"], caution: m.speechCost };
+  },
+  generate_talking_video: (args) => {
+    const m = t.approvalCard.media;
+    const script = str(args.script);
+    const highlights: ApprovalView["highlights"] = [];
+    if (script) highlights.push(text(m.script, script, { long: true }));
+    const image = str(args.imageMediaId);
+    highlights.push(text(m.presenter, image ? m.presenterChosen : m.presenterDefault));
+    const resolution = str(args.resolution);
+    if (resolution) highlights.push(text(m.resolution, resolution, { ltr: true }));
+    return { highlights, omit: ["script", "imageMediaId", "audioMediaId", "resolution"], caution: m.videoCost };
+  },
+  generate_scene_video: (args) => {
+    const m = t.approvalCard.media;
+    const highlights: ApprovalView["highlights"] = [];
+    const prompt = str(args.prompt);
+    if (prompt) highlights.push(text(m.scenePrompt, prompt, { long: true, ltr: true }));
+    if (typeof args.durationSecs === "number") highlights.push(text(m.duration, m.seconds(formatNumber(args.durationSecs))));
+    const aspect = str(args.aspectRatio);
+    if (aspect) highlights.push(text(m.aspect, aspect, { ltr: true }));
+    const resolution = str(args.resolution);
+    if (resolution) highlights.push(text(m.resolution, resolution, { ltr: true }));
+    highlights.push(text(m.presenter, str(args.presenterMediaId) ? m.presenterChosen : m.noPresenter));
+    return { highlights, omit: ["prompt", "durationSecs", "aspectRatio", "resolution", "presenterMediaId"], caution: m.videoCost };
+  },
   fetch_url: (args) => {
     const url = typeof args.url === "string" ? asUrl(args.url.trim()) : null;
     const highlights: ApprovalView["highlights"] = [];
@@ -239,7 +281,7 @@ export function describeToolCall(toolName: string, args: unknown, names: Names =
     tool: toolName,
     title: toolDisplayName(toolName),
     destructive: isDestructiveTool(toolName),
-    caution: custom?.caution ?? null,
+    caution: custom?.caution,
     highlights: custom?.highlights ?? [],
     fields: fieldsOf(rest),
   };

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { ShieldAlertIcon, ShieldQuestionIcon } from "lucide-react";
+import { CircleDollarSignIcon, ShieldAlertIcon, ShieldQuestionIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
 import { describeToolCall, fieldsOf, nameLookupIds, type Field, type FieldValue } from "@/lib/approval-view";
@@ -158,7 +158,7 @@ export function ApprovalCard({
   children: React.ReactNode;
 }) {
   const view = describeToolCall(toolName, args);
-  const Icon = view.destructive || view.caution ? ShieldAlertIcon : ShieldQuestionIcon;
+  const Icon = view.destructive ? ShieldAlertIcon : view.caution ? CircleDollarSignIcon : ShieldQuestionIcon;
   return (
     <div
       data-slot="approval-card"
@@ -166,15 +166,22 @@ export function ApprovalCard({
       className={cn(
         "bg-card my-2 flex flex-col gap-3 rounded-xl border p-3 text-sm",
         view.destructive && "border-destructive/40",
-        view.caution && !view.destructive && "border-amber-500/50 bg-amber-500/5",
+        view.caution && !view.destructive && "border-amber-500/50",
       )}
     >
       <div className="flex items-center gap-2 font-medium">
-        <Icon className={cn("size-4 shrink-0", view.destructive ? "text-destructive" : view.caution ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground")} />
+        <Icon
+          className={cn(
+            "size-4 shrink-0",
+            view.destructive ? "text-destructive" : view.caution ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+          )}
+        />
         <span className="min-w-0 wrap-anywhere">{t.approvalCard.heading(view.title)}</span>
       </div>
       {view.destructive && <p className="text-destructive text-xs">{t.approvalCard.destructive}</p>}
-      {view.caution && !view.destructive && <p className="text-xs text-amber-700 dark:text-amber-300">{view.caution}</p>}
+      {view.caution && !view.destructive && (
+        <p className="rounded-md bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300">{view.caution}</p>
+      )}
       <ToolCallDetails toolName={toolName} args={args} argsText={argsText} />
       {children}
     </div>
