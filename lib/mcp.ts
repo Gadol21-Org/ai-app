@@ -318,13 +318,28 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
   return pending;
 }
 
+/** A server that has not answered by then is skipped for this message, so it cannot hang the chat. */
+const MCP_LOAD_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no answer in ${MCP_LOAD_TIMEOUT_MS / 1000}s`)), MCP_LOAD_TIMEOUT_MS);
+    promise.then(
+      (value) => (clearTimeout(timer), resolve(value)),
+      (error) => (clearTimeout(timer), reject(error)),
+    );
+    // The connection attempt keeps going and is reused by the next message if it finishes.
+    promise.catch(() => {});
+  });
+}
+
 /** Tools from every configured MCP server, or `{}` when none are configured or reachable. */
 export async function getMcpTools(): Promise<ToolSet> {
   const entries = Object.entries(getMcpServers());
   const results = await Promise.all(
     entries.map(async ([name, config]) => {
       try {
-        return (await load(name, config)).tools;
+        return (await withTimeout(load(name, config))).tools;
       } catch (error) {
         console.error(
           `[mcp] ${name} unavailable:`,
