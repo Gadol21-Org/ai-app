@@ -242,19 +242,6 @@ const tailored: Record<string, (args: Record<string, unknown>, names: Names) => 
     if (resolution) highlights.push(text(m.resolution, resolution, { ltr: true }));
     return { highlights, omit: ["script", "imageMediaId", "audioMediaId", "resolution"], caution: m.videoCost };
   },
-  generate_scene_video: (args) => {
-    const m = t.approvalCard.media;
-    const highlights: ApprovalView["highlights"] = [];
-    const prompt = str(args.prompt);
-    if (prompt) highlights.push(text(m.scenePrompt, prompt, { long: true, ltr: true }));
-    if (typeof args.durationSecs === "number") highlights.push(text(m.duration, m.seconds(formatNumber(args.durationSecs))));
-    const aspect = str(args.aspectRatio);
-    if (aspect) highlights.push(text(m.aspect, aspect, { ltr: true }));
-    const resolution = str(args.resolution);
-    if (resolution) highlights.push(text(m.resolution, resolution, { ltr: true }));
-    highlights.push(text(m.presenter, str(args.presenterMediaId) ? m.presenterChosen : m.noPresenter));
-    return { highlights, omit: ["prompt", "durationSecs", "aspectRatio", "resolution", "presenterMediaId"], caution: m.videoCost };
-  },
   fetch_url: (args) => {
     const url = typeof args.url === "string" ? asUrl(args.url.trim()) : null;
     const highlights: ApprovalView["highlights"] = [];

@@ -121,12 +121,9 @@ accepts these uploads, so the model can't swap in a generated face (`generate_im
 3. `list_presenters` shows the uploaded photos.
 4. `generate_talking_video` sends the presenter photo + speech to ElevenLabs' lip-sync model (**Creatify Aurora**,
    720p) and returns at once; the app finishes the render in the background, stores the MP4 and sends a notification.
-5. `generate_scene_video` is the one-step alternative: a Google Veo 3.1 Fast clip (4-8 s) with its own speech and sound
-   from a single prompt, started from the presenter photo when a person appears. Good for short b-roll; the voice
-   can't be chosen and the face is less faithful than with the lip-sync model.
 
 ElevenLabs' separate Avatars product has no API yet, so the two-step flow above is what is available as a single
-pipeline. **Speech and both video tools always ask for approval** (the card shows the script); images run without
+pipeline. **Speech and the video tool always ask for approval** (the card shows the script); images run without
 asking. Scheduled runs have nobody to ask (and a parked approval can't be resumed yet), so they only get the
 unapproved tools: a scheduled "ad" prompt writes the script and notifies you. You open
 its conversation (sidebar **Scheduled**), reply "continue", and approve the speech and video cards there. Example
