@@ -11,7 +11,6 @@ import { generateAndWait, isElevenLabsConfigured, searchVoices, startGeneration,
  *   uploaded photo + speech -> lip-synced video, asks first).
  * The presenter is always a real person's uploaded photo (Settings > Media library); the tools never
  * invent a face unless ELEVENLABS_ALLOW_GENERATED_PRESENTER=1.
- * `generate_scene_video` is the one-step alternative (a Veo clip with its own speech and sound).
  * Everything is stored in the media library (Settings > Media) and referred to by id.
  */
 
@@ -26,7 +25,6 @@ const ttsModel = () => {
 const defaultVoiceId = () => process.env.ELEVENLABS_DEFAULT_VOICE_ID?.trim() || undefined;
 const IMAGE_MODEL = () => process.env.ELEVENLABS_IMAGE_MODEL?.trim() || "gemini-3.1-flash-image";
 const LIPSYNC_MODEL = "creatify-aurora";
-const SCENE_MODEL = () => process.env.ELEVENLABS_SCENE_MODEL?.trim() || "veo-3.1-fast-generate-001";
 
 const ref = (m: { id: string; kind: string; title: string; status?: string }) => ({
   mediaId: m.id,
@@ -218,47 +216,6 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
     },
   });
 
-  const generateSceneVideo = tool({
-    description:
-      "One-step alternative to the talking-video pipeline: generate a short video clip with sound from a single prompt (Google Veo 3.1, via ElevenLabs). " +
-      "Put any spoken line in quotes inside the prompt and the model speaks it; the voice cannot be chosen and lip-sync/Hebrew quality is less predictable than generate_talking_video. " +
-      "If a person appears it must be the presenter: pass presenterMediaId (from list_presenters) and do not describe another person; the presenter's photo is the first frame. Never invent a face. " +
-      "Clips are 4, 6 or 8 seconds. Costs real money, so a person must approve it first; call it once and do not retry if it is declined. " +
-      "Returns a mediaId with status 'generating'; the person is notified when it is ready.",
-    inputSchema: z.object({
-      prompt: z.string().min(1).max(2000).describe("Scene, camera, mood and the quoted spoken line, in English."),
-      title: z.string().min(1).max(120).describe("Name of the video, written in Hebrew."),
-      presenterMediaId: z.string().min(1).optional().describe("Presenter photo to start the clip from; required when a person appears."),
-      aspectRatio: z.enum(["9:16", "16:9"]).default("9:16"),
-      durationSecs: z.union([z.literal(4), z.literal(6), z.literal(8)]).default(8),
-      resolution: z.enum(["720p", "1080p"]).default("720p"),
-    }),
-    execute: async ({ prompt, title, presenterMediaId, aspectRatio, durationSecs, resolution }) => {
-      const model = SCENE_MODEL();
-      const presenter = presenterMediaId ? await resolvePresenter(presenterMediaId) : undefined;
-      const externalId = await startGeneration("video", {
-        model_id: model,
-        prompt,
-        aspect_ratio: aspectRatio,
-        duration_secs: durationSecs,
-        resolution,
-        generate_audio: true,
-        ...(presenter
-          ? { start_frame: { type: "inline_base64", content_base64: base64(presenter.data!), mime_type: presenter.mimeType ?? "image/jpeg" } }
-          : {}),
-      });
-      const id = await startMedia({
-        kind: "video",
-        title,
-        prompt,
-        externalId,
-        details: { flow: "video", model, aspectRatio, durationSecs, resolution, presenterMediaId: presenterMediaId ?? null },
-        threadId: ctx.threadId,
-      });
-      return { ...ref({ id, kind: "video", title, status: "generating" }), note: t.mediaLibrary.renderingNote };
-    },
-  });
-
   return {
     list_voices: { tool: listVoices, requiresApproval: false, availableInScheduledRuns: true },
     // Speech costs credits and the script is what the ad says, so it asks. A scheduled run can't ask
@@ -273,6 +230,5 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
       : {}),
     list_media: { tool: listMediaTool, requiresApproval: false, availableInScheduledRuns: true },
     generate_talking_video: { tool: generateTalkingVideo, requiresApproval: true, availableInScheduledRuns: false },
-    generate_scene_video: { tool: generateSceneVideo, requiresApproval: true, availableInScheduledRuns: false },
   };
 }
