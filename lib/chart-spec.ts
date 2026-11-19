@@ -17,27 +17,27 @@ const chartFields = {
     type: z
       .enum(CHART_TYPES)
       .describe(
-        "line: trend over time. bar: compare categories (use stacked for parts of a total). area: trend of a total or cumulative values. pie: share of a whole, 2 to 8 slices, one series. scatter: relationship between two numbers, one series (xKey and the series key must both be numeric).",
+        "line: trend over time. bar: compare categories. area: trend of a total. pie: share of a whole (2-8 slices, one series). scatter: two numbers (one series, xKey numeric).",
       ),
     title: z
       .string()
       .min(1)
       .max(120)
       .describe(
-        "Short chart title. Write it in Hebrew unless the user used another language.",
+        "Short title.",
       ),
     description: z
       .string()
       .max(240)
       .optional()
       .describe(
-        "Optional one-line subtitle, such as the period or the data source.",
+        "Optional subtitle.",
       ),
     xKey: z
       .string()
       .min(1)
       .describe(
-        "The field in each data row used for the x axis (or for the slice name in a pie).",
+        "Row field for the x axis (pie: slice name).",
       ),
     series: z
       .array(
@@ -46,48 +46,48 @@ const chartFields = {
             .string()
             .min(1)
             .describe(
-              "The field in each data row holding this series' number.",
+              "Row field holding the number.",
             ),
           label: z
             .string()
             .min(1)
             .max(60)
-            .describe("Legend label, in the user's language."),
+            .describe("Legend label."),
         }),
       )
       .min(1)
       .max(MAX_SERIES)
       .describe(
-        "One entry per line, bar group or pie measure. A pie or scatter takes exactly one.",
+        "One per line or bar group; pie and scatter take one.",
       ),
     data: z
       .array(z.record(z.string(), cell))
       .min(1)
       .max(MAX_ROWS)
       .describe(
-        'The rows, e.g. [{ "day": "א׳", "spend": 210, "revenue": 640 }]. Use the real numbers from your tools, never invented ones. Numbers must be plain numbers, not strings.',
+        'Rows, e.g. [{"day":"א׳","spend":210}]. Real numbers only, as numbers not strings.',
       ),
     stacked: z
       .boolean()
       .optional()
-      .describe("Stack the series (bar and area only)."),
+      .describe("Stack series (bar, area)."),
     xLabel: z
       .string()
       .max(60)
       .optional()
       .describe(
-        "Optional title for the x axis, in the user's language. Useful for scatter charts.",
+        "X axis title.",
       ),
     yLabel: z
       .string()
       .max(60)
       .optional()
-      .describe("Optional title for the y axis, in the user's language."),
+      .describe("Y axis title."),
     unit: z
       .string()
       .max(12)
       .optional()
-      .describe("A unit shown after values, such as ₪ or %."),
+      .describe("Unit after values, e.g. ₪ or %."),
   };
 
 type ChartCheckInput = {

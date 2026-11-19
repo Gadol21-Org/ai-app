@@ -40,24 +40,23 @@ export type AgentTool = {
 
 const addSchedule = tool({
   description:
-    "Save a prompt to be run automatically later, once or on a repeating schedule (for example a weekly budget summary). " +
-    "The user sees the title and prompt and must approve before anything is saved. " +
-    "The prompt is run later with no conversation, so make it fully self-contained.",
+    "Save a prompt to run automatically later, once or repeating (e.g. a weekly budget summary). The user must approve it first. " +
+    "It runs with no conversation, so make the prompt self-contained.",
   inputSchema: z
     .object({
-      title: z.string().min(1).max(120).describe("Short name for the schedule, shown in Settings. Write it in Hebrew unless the user used another language."),
-      prompt: z.string().min(1).max(4000).describe("The full instruction to run at each scheduled time."),
+      title: z.string().min(1).max(120).describe("Short name, in the user's language."),
+      prompt: z.string().min(1).max(4000).describe("The instruction to run."),
       runAt: z
         .string()
-        .datetime({ offset: true })
+        .refine((v) => !Number.isNaN(Date.parse(v)) && /(Z|[+-]\d{2}:?\d{2})$/i.test(v), "Use ISO 8601 with a UTC offset.")
         .optional()
-        .describe("One-off: when to run, ISO 8601 with UTC offset, e.g. 2026-11-12T08:00:00+02:00. Use this OR cron."),
+        .describe("One-off time, ISO 8601 with UTC offset, e.g. 2026-11-12T08:00:00+02:00. Use this OR cron."),
       cron: z
         .string()
         .min(1)
         .optional()
         .describe(
-          "Repeating: 5-field cron expression (minute hour day-of-month month day-of-week) in the app's time zone, e.g. '0 8 * * 1-5' for weekdays at 08:00. Use this OR runAt.",
+          "Repeating: 5-field cron in the app's time zone, e.g. '0 8 * * 1-5'. Use this OR runAt.",
         ),
     })
     // Checked before the user is asked, so they are never shown a schedule that can't be saved.
@@ -182,10 +181,8 @@ function makeSendNotificationTool(ctx: ToolContext) {
 
 const renderChartTool = tool({
   description:
-    "Draw a chart in the chat from numbers you already have (from your tools or the conversation). " +
-    "Use it whenever the user asks for a graph or chart, or when a trend, comparison or share of a total is clearer drawn than listed. " +
-    "Call it once per chart, then add one or two sentences of insight in your own words; do not repeat the numbers as a table. " +
-    "It cannot fetch data: get the numbers first.",
+    "Draw one chart from numbers you already have; it cannot fetch data. Use it when asked for a graph, or when a trend, comparison or share is clearer drawn. " +
+    "Then add a sentence or two of insight, not a table of the numbers. Write titles and labels in the user's language (Hebrew by default).",
   inputSchema: chartSpecSchema,
   execute: async (spec) => ({
     shown: true as const,
