@@ -4,6 +4,7 @@ import { Fragment } from "react";
 import { CircleDollarSignIcon, ShieldAlertIcon, ShieldQuestionIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t } from "@/lib/i18n";
+import { MediaPreview } from "@/components/media-preview";
 import { describeToolCall, fieldsOf, type Field, type FieldValue } from "@/lib/approval-view";
 
 function Value({ value }: { value: FieldValue }) {
@@ -28,6 +29,8 @@ function Value({ value }: { value: FieldValue }) {
           {value.text}
         </a>
       );
+    case "media":
+      return <MediaPreview id={value.id} kind={value.mediaKind} status="ready" title={value.title} />;
     case "list": {
       const simple = value.items.every((item) => item.kind === "text" && !item.long);
       return simple ? (
