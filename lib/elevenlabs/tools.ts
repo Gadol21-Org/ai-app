@@ -189,7 +189,7 @@ export function makeAdTools(ctx: AdToolContext): Record<string, { tool: ToolSet[
       "The video's shape follows the image's aspect ratio and its length follows the audio.",
     inputSchema: z.object({
       audioMediaId: z.string().min(1).describe("mediaId of the speech from generate_speech."),
-      imageMediaId: z.string().min(1).optional().describe("mediaId of a presenter photo from list_presenters. Omit to use the default presenter."),
+      imageMediaId: z.string().min(1).describe("mediaId of a presenter photo from list_presenters (the first one is the default). Shown to the person who approves."),
       title: z.string().min(1).max(120).describe("Name of the video, written in Hebrew."),
       script: z.string().min(1).max(2000).describe("The spoken words, copied from the speech. Shown to the person who approves."),
       resolution: z.enum(["480p", "720p"]).default("720p"),

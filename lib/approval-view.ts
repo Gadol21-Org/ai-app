@@ -9,6 +9,8 @@ import { LOCALE, formatNumber, t, toolDisplayName } from "@/lib/i18n";
 export type FieldValue =
   | { kind: "text"; text: string; long?: boolean; ltr?: boolean }
   | { kind: "link"; href: string; text: string }
+  /** A stored file (audio, image) the person can play or look at before deciding. */
+  | { kind: "media"; id: string; mediaKind: "audio" | "image" | "video"; title: string }
   | { kind: "list"; items: FieldValue[] }
   | { kind: "group"; fields: Field[] };
 
@@ -113,6 +115,8 @@ export function valueText(value: FieldValue): string {
       return value.text;
     case "link":
       return value.text;
+    case "media":
+      return value.title;
     case "list":
       return value.items.map(valueText).join(", ");
     case "group":
@@ -236,8 +240,15 @@ const tailored: Record<string, (args: Record<string, unknown>, names: Names) => 
     const script = str(args.script);
     const highlights: ApprovalView["highlights"] = [];
     if (script) highlights.push(text(m.script, script, { long: true }));
+    // Listen to the speech and see the face before paying for the video.
+    const audio = str(args.audioMediaId);
+    if (audio) highlights.unshift({ label: m.audio, value: { kind: "media", id: audio, mediaKind: "audio", title: m.audio } });
     const image = str(args.imageMediaId);
-    highlights.push(text(m.presenter, image ? m.presenterChosen : m.presenterDefault));
+    highlights.push(
+      image
+        ? { label: m.presenter, value: { kind: "media", id: image, mediaKind: "image", title: m.presenter } }
+        : text(m.presenter, m.presenterDefault),
+    );
     const resolution = str(args.resolution);
     if (resolution) highlights.push(text(m.resolution, resolution, { ltr: true }));
     return { highlights, omit: ["script", "imageMediaId", "audioMediaId", "resolution"], caution: m.videoCost };

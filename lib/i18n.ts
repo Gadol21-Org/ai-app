@@ -209,6 +209,7 @@ export const t = {
       defaultVoice: "קול ברירת המחדל של המשפחה",
       language: "שפה",
       characters: "אורך (תווים)",
+      audio: "הקול שנוצר (אפשר להאזין לפני האישור)",
       presenter: "מגישה",
       presenterDefault: "תמונת המגישה שהועלתה (ברירת מחדל)",
       presenterChosen: "תמונת מגישה שהועלתה",
