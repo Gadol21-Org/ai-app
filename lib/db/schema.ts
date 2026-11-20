@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  customType,
   decimal,
   index,
   int,
@@ -186,4 +187,38 @@ export const pushSubscriptions = mysqlTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("push_endpoint").on(t.endpoint), index("push_user").on(t.userId)],
+);
+
+/** MySQL LONGBLOB (up to 4 GB; the connection's max_allowed_packet is the practical limit). */
+const longblob = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "longblob",
+});
+
+/**
+ * Generated audio, images and videos (the ad pipeline). The bytes live here, not on disk, because
+ * the container is replaced on every deploy and has no volume. A video that is still being
+ * rendered has no bytes yet: `status` is "generating" and `externalId` is the provider's job id.
+ */
+export const media = mysqlTable(
+  "media",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    kind: mysqlEnum("kind", ["audio", "image", "video"]).notNull(),
+    status: mysqlEnum("status", ["generating", "ready", "failed"]).notNull().default("ready"),
+    title: varchar("title", { length: 255 }).notNull(),
+    /** The script, prompt or other text this was made from. */
+    prompt: text("prompt"),
+    mimeType: varchar("mime_type", { length: 64 }),
+    bytes: bigint("bytes", { mode: "number", unsigned: true }),
+    data: longblob("data"),
+    /** Provider job id while generating (e.g. an ElevenLabs flows generation). */
+    externalId: varchar("external_id", { length: 128 }),
+    error: text("error"),
+    /** Model, voice, duration and the media it was made from. */
+    details: json("details").$type<Record<string, unknown>>(),
+    threadId: varchar("thread_id", { length: 64 }),
+    createdAt: createdAt(),
+    finishedAt: timestamp("finished_at", { fsp: 3 }),
+  },
+  (t) => [index("media_created").on(t.createdAt), index("media_status").on(t.status)],
 );
