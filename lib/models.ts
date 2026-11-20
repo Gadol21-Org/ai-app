@@ -1,5 +1,5 @@
 import { google } from "@ai-sdk/google";
-import type { LanguageModel } from "ai";
+import { defaultSettingsMiddleware, wrapLanguageModel, type LanguageModel } from "ai";
 import { DEFAULT_CHAT_MODEL, isSelectableModel } from "@/lib/model-catalog";
 
 /**
@@ -9,8 +9,18 @@ import { DEFAULT_CHAT_MODEL, isSelectableModel } from "@/lib/model-catalog";
  * to add another provider (Anthropic, OpenAI, ...) install its @ai-sdk package
  * and add one entry to `providers`. Nothing else in the app needs to change.
  */
-const providers: Record<string, (modelId: string) => LanguageModel> = {
+const providers: Record<string, (modelId: string) => Exclude<LanguageModel, string>> = {
   google: (modelId) => google(modelId),
+};
+
+/**
+ * Per-model default settings (applied to chats, titles and scheduled runs alike). Models not listed
+ * here keep the provider's own defaults.
+ */
+const modelDefaults: Record<string, Parameters<typeof defaultSettingsMiddleware>[0]["settings"]> = {
+  "google:gemini-3.5-flash-lite": {
+    providerOptions: { google: { thinkingConfig: { thinkingLevel: "medium" } } },
+  },
 };
 
 /**
@@ -29,7 +39,9 @@ export function getChatModel(spec = getChatModelId()) {
       `Invalid CHAT_MODEL "${spec}". Use "<provider>:<model>", e.g. ${DEFAULT_CHAT_MODEL}. Known providers: ${Object.keys(providers).join(", ")}`,
     );
   }
-  return create(rest.join(":"));
+  const model = create(rest.join(":"));
+  const settings = modelDefaults[spec];
+  return settings ? wrapLanguageModel({ model, middleware: defaultSettingsMiddleware({ settings }) }) : model;
 }
 
 /** The model for a chat request: the person's pick when it is a known option, else the default. */
