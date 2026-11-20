@@ -1,4 +1,13 @@
-import { convertToModelMessages, generateId, isStepCount, pruneMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStreamResponse,
+  generateId,
+  isStepCount,
+  pruneMessages,
+  streamText,
+  type UIMessage,
+} from "ai";
+import { endRun, isRunning, startRun } from "@/lib/chat-runs";
 import { getCurrentUser, unauthorized } from "@/lib/auth";
 import { getChatModel, resolveChatModelId } from "@/lib/models";
 import { SYSTEM_PROMPT } from "@/lib/system-prompt";
@@ -91,6 +100,7 @@ async function handleChat(req: Request) {
   const { threadId } = body;
   if (!isId(threadId)) return Response.json({ error: t.errors.invalidId }, { status: 400 });
   if (!(await getThread(threadId))) return Response.json({ error: t.errors.notFound }, { status: 404 });
+  if (isRunning(threadId)) return Response.json({ error: t.errors.replyInProgress }, { status: 409 });
 
   const modelId = resolveChatModelId(body.model);
   // Remember the pick so reopening the conversation shows (and keeps using) the same model.
@@ -164,8 +174,13 @@ async function handleChat(req: Request) {
   const tools = await getChatTools(threadId);
   const allowedTools = await getAllowedTools(threadId);
 
+  // The reply is not tied to this request: when the browser goes away (a phone backgrounding the app)
+  // it keeps being written and saved. Only the Stop button (/api/chat/:id/stop) aborts it.
+  const run = startRun(threadId);
+  if (!run) return Response.json({ error: t.errors.replyInProgress }, { status: 409 });
+
   const result = streamText({
-    abortSignal: req.signal,
+    abortSignal: run.controller.signal,
     model: getChatModel(modelId),
     // Constant, so the provider's prompt cache can reuse it and the conversation after it.
     system: `${SYSTEM_PROMPT}\n\n${TURN_CONTEXT_INSTRUCTIONS} When a tool call is not approved, do not retry it.`,
@@ -198,7 +213,7 @@ async function handleChat(req: Request) {
       }),
   });
 
-  return result.toUIMessageStreamResponse({
+  const chunks = result.toUIMessageStream({
     // With the history given, the reply continues the approval's message, or is a new one whose
     // id the browser learns from the stream (it must match the saved row).
     originalMessages: history,
@@ -216,4 +231,19 @@ async function handleChat(req: Request) {
     },
     onError: (error) => (error instanceof Error ? error.message : String(error)),
   });
+
+  // Drained here, whether or not a browser is listening. Browsers (this one, or one that reconnects
+  // later) read the run's copy of the chunks.
+  void (async () => {
+    try {
+      for await (const chunk of chunks) run.push(chunk);
+    } catch (error) {
+      console.error("chat stream failed", error);
+      run.push({ type: "error", errorText: error instanceof Error ? error.message : String(error) });
+    } finally {
+      endRun(threadId, run);
+    }
+  })();
+
+  return createUIMessageStreamResponse({ stream: run.stream() });
 }

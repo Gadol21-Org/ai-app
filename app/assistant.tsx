@@ -21,14 +21,43 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { ResumeReply } from "@/components/resume-reply";
 import { OpenConversation } from "@/components/open-conversation";
 import { NotificationBell } from "@/components/notification-bell";
 import { t } from "@/lib/i18n";
+
+/**
+ * The Stop button aborts the request, and that is the one thing that stops a reply on the server:
+ * a connection that merely drops (app in the background) leaves it running. The abort is the only
+ * signal the server can tell apart from a drop, so it is forwarded as an explicit stop.
+ */
+const stopOnAbort: typeof fetch = (input, init) => {
+  const signal = init?.signal;
+  const body = typeof init?.body === "string" ? init.body : "";
+  if (init?.method === "POST" && signal && body) {
+    try {
+      const { threadId } = JSON.parse(body) as { threadId?: string };
+      if (threadId) {
+        signal.addEventListener(
+          "abort",
+          () => void fetch(`/api/chat/${encodeURIComponent(threadId)}/stop`, { method: "POST", keepalive: true }).catch(() => {}),
+          { once: true },
+        );
+      }
+    } catch {}
+  }
+  return fetch(input, init);
+};
 
 const useThreadRuntime = () =>
   useChatRuntime({
     transport: new AssistantChatTransport({
       api: "/api/chat",
+      fetch: stopOnAbort,
+      // A reply still running on the server is reconnected by the conversation's own id.
+      prepareReconnectToStreamRequest: ({ body }) => ({
+        api: `/api/chat/${encodeURIComponent(String((body as { threadId?: string } | undefined)?.threadId ?? ""))}/stream`,
+      }),
       // The model picked in the composer, resolved when each message is sent.
       body: () => ({ model: getSelectedModel() }),
       prepareSendMessagesRequest: ({ id, messages, body }) => ({
@@ -48,6 +77,7 @@ export const Assistant = ({ timezone }: { timezone: string }) => {
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <OpenConversation />
+      <ResumeReply />
       <ScheduleTimezoneContext.Provider value={timezone}>
         <SidebarProvider>
           <div className="app-shell flex w-full">
