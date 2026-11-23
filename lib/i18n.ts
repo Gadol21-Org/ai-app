@@ -464,6 +464,7 @@ export const t = {
     notFound: "לא נמצא",
     enabledBoolean: "enabled חייב להיות ערך בוליאני",
     invalidMessage: "הודעה לא תקינה",
+    replyInProgress: "התשובה הקודמת עדיין בהכנה. אפשר לחכות או ללחוץ על עצירה.",
   },
 
   /** Hebrew names for agent tools; a tool without an entry is shown by its code name. */
