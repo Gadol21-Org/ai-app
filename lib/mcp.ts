@@ -349,6 +349,45 @@ export function needsApproval(
 // (a stdio server is a child process, too slow to start for every message).
 const loaded = new Map<string, Promise<Loaded>>();
 
+/** The AI SDK's error once a client was closed, e.g. a stdio server process that exited. */
+export function isClosedClientError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /closed client|client is closed|connection closed/i.test(message);
+}
+
+/**
+ * If a call fails because the shared client is closed, drop it, reconnect and retry the call once,
+ * so a dead server does not stay broken until the whole app restarts.
+ */
+function withReconnect(name: string, config: McpServerConfig, current: Loaded): ToolSet {
+  const wrapped: ToolSet = {};
+  for (const [toolName, tool] of Object.entries(current.tools)) {
+    const execute = tool.execute;
+    if (!execute) {
+      wrapped[toolName] = tool;
+      continue;
+    }
+    wrapped[toolName] = {
+      ...tool,
+      execute: async (...args: Parameters<typeof execute>) => {
+        try {
+          return await execute(...args);
+        } catch (error) {
+          if (!isClosedClientError(error)) throw error;
+          console.warn(`[mcp] ${name} client was closed; reconnecting`);
+          const stale = loaded.get(name);
+          if (stale && (await stale.catch(() => undefined)) === current) loaded.delete(name);
+          const fresh = await load(name, config);
+          const retry = fresh.tools[toolName]?.execute;
+          if (!retry) throw error;
+          return retry(...args);
+        }
+      },
+    } as typeof tool;
+  }
+  return wrapped;
+}
+
 function load(name: string, config: McpServerConfig): Promise<Loaded> {
   let pending = loaded.get(name);
   if (!pending) {
@@ -363,7 +402,9 @@ function load(name: string, config: McpServerConfig): Promise<Loaded> {
           if (needsApproval(toolName, config))
             approvalRequired.add(toolName);
         }
-        return { client, tools };
+        const result: Loaded = { client, tools };
+        result.tools = withReconnect(name, config, result);
+        return result;
       } catch (error) {
         await client.close().catch(() => {});
         throw error;
