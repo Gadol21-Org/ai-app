@@ -66,7 +66,7 @@ export async function runSchedule(schedule: Schedule) {
       abortSignal: AbortSignal.timeout(RUN_TIMEOUT_MS),
       model: getChatModel(),
       // Constant across runs (cacheable); the run's own details go after the prompt instead.
-      system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching, so do not ask questions.`,
+      system: `${SYSTEM_PROMPT}\n\nThis is a scheduled task running automatically; nobody is watching, so do not ask questions. Tool results are not saved with this conversation, so state in your final reply everything the person needs to continue from it: the ids of any media you made (and what each is), the full script, and what you are waiting for them to approve.`,
       prompt: `${schedule.prompt}\n\n<context>\n${context.note}\n</context>`,
       tools,
       toolApproval: getToolApproval(tools),

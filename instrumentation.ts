@@ -14,6 +14,9 @@ export async function register() {
   const { startScheduler } = await import("@/lib/schedules/runner");
   await startScheduler();
 
+  const { startMediaFinalizer } = await import("@/lib/media/finalize");
+  startMediaFinalizer();
+
   const { purgeExpiredThreads, retentionDays } = await import("@/lib/retention");
   const purge = async () => {
     try {
